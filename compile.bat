@@ -12,8 +12,8 @@ python setup.py install --prefix=dist
 
 rd /s /q pkg
 md pkg
-md pkg\atx300\%name%
-cp -av dist/* pkg/atx300/%name%/
+md pkg\%name%
+cp -av dist/* pkg/%name%/
 cp atxpkg_backup pkg/.atxpkg_backup
 
 rd /s /q build
