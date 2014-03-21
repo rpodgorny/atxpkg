@@ -5,15 +5,18 @@ Asterix package manager.
 
 Usage:
   atxpkg init
-  atxpkg install [options] <package>...
-  atxpkg update [options] [<package>...]
-  atxpkg remove [options] <package>...
+  atxpkg install [--prefix=<path>] [--force] <package>...
+  atxpkg update [--prefix=<path>] [--force] [<package>...]
+  atxpkg remove [--prefix=<path>] <package>...
+  atxpkg check [--prefix=<path>] [<package>...]
+  atxpkg diff [--prefix=<path>] [<package>...]
+  atxpkg show_untracked [<path>]
   atxpkg clean_cache
 
 Options:
-  --force            Force operations (overwrite files etc.)
-  -h,--help          This screen.
-  --prefix=<prefix>  Path prefix.
+  --force          Force operation (overwrite files etc.)
+  -h,--help        This screen.
+  --prefix=<path>  Path prefix.
 
 '''
 
@@ -98,7 +101,9 @@ def parse_index_html(html):
 	from bs4 import BeautifulSoup
 	soup = BeautifulSoup(html)
 	for tag in soup.findAll('a', href=True):
-		ret.append(tag['href'])
+		link = tag['href']
+		if not '.atxpkg.' in link: continue  # TODO: convert to more exact match
+		ret.append(link)
 	#endfor
 	return ret
 #enddef
@@ -109,7 +114,9 @@ def get_repo_listing(repo):
 		files = parse_index_html(r.read().decode())
 		return ['%s/%s' % (repo, f) for f in files]
 	else:
-		return glob.glob('%s/*' % repo)
+		lst = glob.glob('%s/*' % repo)
+		lst = [i for i in lst if '.atxpkg.' in i]  # TODO: convert to more exact match
+		return lst
 	#endif
 #enddef
 
