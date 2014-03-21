@@ -4,8 +4,9 @@
 Asterix package manager.
 
 Usage:
-  atxpkg update [options] [<package>...]
+  atxpkg init
   atxpkg install [options] <package>...
+  atxpkg update [options] [<package>...]
   atxpkg remove [options] <package>...
   atxpkg clean_cache
 
@@ -361,6 +362,10 @@ def get_recursive_listing(path):
 #enddef
 
 def get_installed_packages():
+	if not os.path.isfile(db_fn):
+		raise Exception('package database not found (%s)' % db_fn)
+	#endif
+
 	return json.load(open(db_fn, 'r'))
 #enddef
 
@@ -395,6 +400,19 @@ def getlines(fn):
 
 def clean_cache():
 	# TODO: implement
+	pass
+#enddef
+
+def init():
+	if os.path.isfile(db_fn):
+		raise Exception('%s already exists' % db_fn)
+	#endif
+
+	json.dump({}, open(db_fn, 'w'))
+
+	try:
+		os.makedirs(cache_dir)
+	except: pass
 #enddef
 
 def main():
@@ -409,15 +427,11 @@ def main():
 		prefix = args['--prefix']
 	#endif
 
-	if not os.path.isfile(db_fn):
-		logging.critical('package database not found (%s)' % db_fn)
-		return
-	#endif
 
-	installed_packages = get_installed_packages()
-	#logging.debug(str(installed_packages))
-
-	if args['install']:
+	if args['init']:
+		init()
+	elif args['install']:
+		installed_packages = get_installed_packages()
 		available_packages = get_available_packages()
 		logging.debug(str(available_packages))
 
@@ -448,6 +462,7 @@ def main():
 
 		save_installed_packages(installed_packages)
 	elif args['update']:
+		installed_packages = get_installed_packages()
 		available_packages = get_available_packages()
 
 		if args['<package>']:
@@ -484,6 +499,8 @@ def main():
 
 		save_installed_packages(installed_packages)
 	elif args['remove']:
+		installed_packages = get_installed_packages()
+
 		for package in args['<package>']:
 			package_name = get_package_name(package)
 
