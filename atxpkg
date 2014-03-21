@@ -1,0 +1,510 @@
+#!/usr/bin/python3
+
+'''
+Asterix package manager.
+
+Usage:
+  atxpkg update [options] [<package>...]
+  atxpkg install [options] <package>...
+  atxpkg remove [options] <package>...
+  atxpkg clean_cache
+
+Options:
+  --force            Force operations (overwrite files etc.)
+  -h,--help          This screen.
+  --prefix=<prefix>  Path prefix.
+
+'''
+
+__version__ = '0.0'
+
+import docopt
+import logging
+import json
+import urllib.request
+import glob
+import re
+import tempfile
+import shutil
+import os
+import subprocess
+import hashlib
+from distutils.version import LooseVersion
+
+
+repos = [
+	'http://podgorny.cz/~radek/atxpkg',
+	'/tmp/atxpkg'
+]
+
+db_fn = '/tmp/atxpkg.db'
+prefix = ''
+cache_dir = '/tmp/atxpkg/cache'
+
+
+def logging_setup(level):
+	logging.basicConfig(level=level)
+#enddef
+
+
+def get_package_fn(url):
+	return url.split('/')[-1]
+#enddef
+
+def get_package_name(fn):
+	fn = re.sub('\.atxpkg\..*', '', fn)
+	return fn.split('-', 1)[0]
+#enddef
+
+def get_package_version(fn):
+	fn = re.sub('\.atxpkg\..*', '', fn)
+
+	if '-' in fn:
+		return fn.split('-', 1)[1]
+	else:
+		return None
+	#endif
+#enddef
+
+
+def get_available_packages():
+	ret = {}
+
+	for repo in repos:
+		package_urls = get_repo_listing(repo)
+		#logging.debug(str(package_urls))
+
+		for package_url in package_urls:
+			package_fn = get_package_fn(package_url)
+			package_name = get_package_name(package_fn)
+			package_version = get_package_version(package_fn)
+			#print(package_name, package_version)
+
+			if package_name in ret:
+				ret[package_name].append(package_url)
+			else:
+				ret[package_name] = [package_url, ]
+			#endif
+		#endfor
+	#endfor
+
+	return ret
+#enddef
+
+
+def parse_index_html(html):
+	ret = []
+	from bs4 import BeautifulSoup
+	soup = BeautifulSoup(html)
+	for tag in soup.findAll('a', href=True):
+		ret.append(tag['href'])
+	#endfor
+	return ret
+#enddef
+
+def get_repo_listing(repo):
+	if repo.startswith('http://'):
+		r = urllib.request.urlopen(repo)
+		files = parse_index_html(r.read().decode())
+		return ['%s/%s' % (repo, f) for f in files]
+	else:
+		return glob.glob('%s/*' % repo)
+	#endif
+#enddef
+
+def download_package(url):
+	if url.startswith('http://'):
+		fn = '%s/%s' % (cache_dir, get_package_fn(url))
+
+		if not os.path.isfile(fn):
+			logging.info('downloading %s to %s' % (url, fn))
+			urllib.request.urlretrieve(url, fn)
+		else:
+			logging.info('using cached %s' % fn)
+		#endif
+
+		return fn
+	else:
+		return url
+	#endif
+#enddef
+
+def unzip(fn):
+	cmd = 'unzip -q %s' % (fn, )
+	subprocess.call(cmd, shell=True)
+#enddef
+
+def install_package(fn, force=False):
+	name = get_package_name(get_package_fn(fn))
+	version_new = get_package_version(get_package_fn(fn))
+
+	logging.info('installing %s: %s' % (name, version_new))
+
+	ret = {}
+	ret['version'] = get_package_version(get_package_fn(fn))
+	ret['md5sums'] = {}
+
+	try:
+		tmpdir = tempfile.mkdtemp()
+
+		os.chdir(tmpdir)
+		unzip(fn)
+		dirs, files = get_recursive_listing(tmpdir)
+
+		for d in dirs:
+			try:
+				os.makedirs('%s/%s' % (prefix, d))
+			except: pass
+		#endfor
+
+		if not force:
+			for f in files:
+				f = '%s/%s' % (prefix, f)
+				if os.path.isfile(f):
+					raise Exception('%s already exists!' % f)
+				#endif
+			#endfor
+		#endif
+
+		for f in files:
+			ret['md5sums'][f] = get_md5sum(f)
+			try:
+				os.makedirs(os.path.dirname('%s/%s' % (prefix, f)))
+			except: pass
+			logging.debug('I %s/%s' % (prefix, f))
+			shutil.move(f, '%s/%s' % (prefix, f))
+		#endfor
+	finally:
+		shutil.rmtree(tmpdir)
+	#endtry
+
+	return ret
+#endif
+
+def update_package(fn, installed_packages):
+	name = get_package_name(get_package_fn(fn))
+	version_old = installed_packages[name]['version']
+	version_new = get_package_version(get_package_fn(fn))
+
+	logging.info('updating %s: %s -> %s' % (name, version_old, version_new))
+
+	ret = {}
+	ret['version'] = version_new
+	ret['md5sums'] = {}
+
+	try:
+		tmpdir = tempfile.mkdtemp()
+
+		os.chdir(tmpdir)
+		unzip(fn)
+
+		files_to_backup = []
+		if os.path.isfile('.backup'):
+			files_to_backup = getlines('.backup')
+		#endif
+
+		ret['backup'] = files_to_backup
+
+		dirs, files = get_recursive_listing(tmpdir)
+
+		installed_package = installed_packages[name]
+
+		for f in files:
+			if os.path.isfile('%s/%s' % (prefix, f)) and not f in installed_package['md5sums']:
+				raise Exception('%s/%s exists in filesystem but is not part of original package' % (prefix, f))
+			#endif
+		#endfor
+
+		for f in files:
+			sum_new = get_md5sum(f)
+
+			ret['md5sums'][f] = sum_new
+			try:
+				os.makedirs(os.path.dirname('%s/%s' % (prefix, f)))
+			except: pass
+
+			if os.path.isfile('%s/%s' % (prefix, f)):
+				backup = False
+				if f in files_to_backup:
+					sum_current = get_md5sum('%s/%s' % (prefix, f))
+					sum_original = installed_package['md5sums'][f]
+					if sum_original != sum_current:
+						backup = True
+					#endif
+				#endif
+
+				if backup:
+					logging.info('sum for file %s/%s changed, installing new version as .atxpkg_new' % (prefix, f))
+					logging.debug('I %s/%s.atxpkg_new' % (prefix, f))
+					shutil.move(f, '%s/%s.atxpkg_new' % (prefix, f))
+				else:
+					logging.debug('U %s/%s' % (prefix, f))
+					os.remove('%s/%s' % (prefix, f))
+					shutil.move(f, '%s/%s' % (prefix, f))
+				#endif
+			else:
+				logging.debug('I %s/%s' % (prefix, f))
+				shutil.move(f, '%s/%s' % (prefix, f))
+			#endif
+		#endfor
+
+		# remove files which are no longer in the new version
+
+		if 'backup' in installed_package:
+			files_to_backup_old = installed_package['backup']
+		else:
+			files_to_backup_old = []
+		#endif
+
+		for fn, md5sum in installed_package['md5sums'].items():
+			if fn in ret['md5sums']: continue
+
+			if not os.path.isfile('%s/%s' % (prefix, fn)):
+				logging.warning('%s/%s does not exist!' % (prefix, fn))
+				continue
+			#endif
+
+			backup = False
+			if fn in files_to_backup_old:
+				sum_current = get_md5sum('%s/%s' % (prefix, fn))
+				sum_original = md5sum
+				if sum_current != sum_original:
+					backup = True
+				#endif
+			#endif
+
+			if backup:
+				logging.info('saving changed %s/%s as %s/%s.atxpkg_save' % (prefix, fn, prefix, fn))
+				logging.debug('S %s/%s %s/%s.atxpkg_save' % (prefix, fn, prefix, fn))
+				shutil.move('%s/%s' % (prefix, fn), '%s/%s.atxpkg_save' % (prefix, fn))
+			else:
+				logging.debug('D %s/%s' % (prefix, fn))
+				os.remove('%s/%s' % (prefix, fn))
+			#endif
+
+			try:
+				os.removedirs(os.path.dirname('%s/%s' % (prefix, fn)))
+			except: pass
+		#endfor
+	finally:
+		shutil.rmtree(tmpdir)
+	#endtry
+
+	return ret
+#endif
+
+def remove_package(package_name, installed_packages):
+	version = installed_packages[package_name]['version']
+	logging.info('removing package %s: %s' % (package_name, version))
+
+	package_info = installed_packages[package_name]
+
+	if 'backup' in package_info:
+		files_to_backup_old = package_info['backup']
+	else:
+		files_to_backup_old = []
+	#endif
+
+	for fn, md5sum in package_info['md5sums'].items():
+		if not os.path.isfile('%s/%s' % (prefix, fn)):
+			logging.warning('%s/%s does not exist!' % (prefix, fn))
+			continue
+		#endif
+
+		backup = False
+		if fn in files_to_backup_old:
+			current_sum = get_md5sum('%s/%s' % (prefix, fn))
+			original_sum = md5sum
+			if current_sum != original_sum:
+				backup = True
+			#endif
+		#endif
+
+		if backup:
+			logging.info('%s/%s changed, keeping old backup' % (prefix, fn))
+			logging.debug('R %s/%s %s/%s.atxpkg_backup' % (prefix, fn, prefix, fn))
+			os.rename('%s/%s' % (prefix, fn), '%s/%s.atxpkg_backup' % (prefix, fn))
+		else:
+			logging.debug('D %s/%s' % (prefix, fn))
+			os.remove('%s/%s' % (prefix, fn))
+		#endif
+
+		try:
+			os.removedirs(os.path.dirname('%s/%s' % (prefix, fn)))
+		except: pass
+	#endfor
+#enddef
+
+def get_md5sum(fn):
+	return hashlib.md5(open(fn, 'rb').read()).hexdigest()
+#enddef
+
+def get_recursive_listing(path):
+	ret_d = []
+	ret_f = []
+
+	for root, dirs, files in os.walk(path):
+		for d in dirs:
+			ret_d.append('%s/%s' % (root, d))
+		#endfor
+
+		for f in files:
+			ret_f.append('%s/%s' % (root, f))
+		#endfor
+	#endfor
+
+	# cut the tempdir prefix
+	ret_d = [i[len(path) + 1:] for i in ret_d]
+	ret_f = [i[len(path) + 1:] for i in ret_f]
+
+	return ret_d, ret_f
+#enddef
+
+def get_installed_packages():
+	return json.load(open(db_fn, 'r'))
+#enddef
+
+def save_installed_packages(l):
+	json.dump(l, open(db_fn, 'w'), indent=4)
+#enddef
+
+
+def get_max_version_url(urls):
+	return sorted(urls, key=lambda x: LooseVersion(get_package_version(get_package_fn(x))))[-1]
+#enddef
+
+def get_specific_version_url(urls, version):
+	for url in urls:
+		if get_package_version(get_package_fn(url)) == version:
+			return url
+		#endif
+	#endfor
+
+	return None
+#enddef
+
+def getlines(fn):
+	with open(fn, 'r') as f:
+		ret = f.readlines()
+	#endwith
+
+	ret = [i.strip() for i in ret]
+	ret = [i for i in ret if i]
+	return ret
+#enddef
+
+def clean_cache():
+	# TODO: implement
+#enddef
+
+def main():
+	args = docopt.docopt(__doc__, version=__version__)
+
+	logging_setup('DEBUG')
+
+	#logging.debug(str(args))
+
+	global prefix
+	if args['--prefix']:
+		prefix = args['--prefix']
+	#endif
+
+	if not os.path.isfile(db_fn):
+		logging.critical('package database not found (%s)' % db_fn)
+		return
+	#endif
+
+	installed_packages = get_installed_packages()
+	#logging.debug(str(installed_packages))
+
+	if args['install']:
+		available_packages = get_available_packages()
+		logging.debug(str(available_packages))
+
+		for package in args['<package>']:
+			package_name = get_package_name(package)
+
+			if not package_name in available_packages:
+				logging.error('unable to find package %s' % package_name)
+				return
+			#endif
+		#endfor
+
+		for package in args['<package>']:
+			package_name = get_package_name(package)
+			package_version = get_package_version(package)
+
+			if package_version:
+				url = get_specific_version_url(available_packages[package_name], package_version)
+			else:
+				url = get_max_version_url(available_packages[package_name])
+			#endif
+
+			local_fn = download_package(url)
+			force = args['--force']
+			package_info = install_package(local_fn, force)
+			installed_packages[package_name] = package_info
+		#endfor
+
+		save_installed_packages(installed_packages)
+	elif args['update']:
+		available_packages = get_available_packages()
+
+		if args['<package>']:
+			packages = args['<package>']
+
+			for package in packages:
+				package_name = get_package_name(package)
+
+				if not package_name in installed_packages:
+					logging.error('package %s not installed' % package_name)
+					return
+				#endif
+			#endfor
+		else:
+			packages = installed_packages.keys()
+		#endif
+
+		for package in packages:
+			package_name = get_package_name(package)
+			package_version = get_package_version(package)
+
+			if package_version:
+				url = get_specific_version_url(available_packages[package_name], package_version)
+			else:
+				url = get_max_version_url(available_packages[package_name])
+			#endif
+
+			if LooseVersion(get_package_version(get_package_fn(url))) != LooseVersion(installed_packages[package_name]['version']): 
+				local_fn = download_package(url)
+				package_info = update_package(local_fn, installed_packages)
+				installed_packages[package_name] = package_info
+			#endif
+		#endfor
+
+		save_installed_packages(installed_packages)
+	elif args['remove']:
+		for package in args['<package>']:
+			package_name = get_package_name(package)
+
+			if not package_name in installed_packages:
+				logging.error('package %s not installed' % package_name)
+				return
+			#endif
+		#endfor
+
+		for package in args['<package>']:
+			remove_package(package, installed_packages)
+			del installed_packages[package]
+		#endfor
+
+		save_installed_packages(installed_packages)
+	elif args['clean_cache']:
+		clean_cache()
+	#endif
+#enddef
+
+
+if __name__ == '__main__':
+	main()
+#endif
