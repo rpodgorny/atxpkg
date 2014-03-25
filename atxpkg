@@ -9,6 +9,7 @@ Usage:
   atxpkg remove [--prefix=<path>] <package>...
   atxpkg check [--prefix=<path>] [<package>...]
   atxpkg merge_config [--prefix=<path>] [<package>...]
+  atxpkg list_installed
   atxpkg show_untracked [<path>]
   atxpkg clean_cache
 
@@ -663,6 +664,12 @@ def main():
 		#endfor
 
 		save_installed_packages(installed_packages, db_fn)
+	elif args['list_installed']:
+		for package_name, package_info in installed_packages.items():
+			package_version = package_info['version']
+
+			logging.info('%s-%s' % (package_name, package_version))
+		#endfor
 	elif args['clean_cache']:
 		clean_cache(cache_dir)
 	#endif
