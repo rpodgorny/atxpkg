@@ -373,17 +373,22 @@ def mergeconfig_package(package_name, installed_packages, prefix):
 			# just prints the diff
 			#diff('%s/%s' % (prefix, fn), '%s/%s.atxpkg_new' % (prefix, fn))
 
-			ans = None
-			while not ans in ['y', 'n']:
-				ans = input('delete %s/%s.atxpkg_new? [y/n] ' % (prefix, fn))
-			#endwhile
-
-			if ans == 'y':
+			if yes_no('delete %s/%s.atxpkg_new?' % (prefix, fn)):
 				logging.debug('D %s/%s.atxpkg_new' % (prefix, fn))
 				os.remove('%s/%s.atxpkg_new' % (prefix, fn))
 			#endif
 		#endif
 	#endfor
+#enddef
+
+def yes_no(s):
+	ans = None
+
+	while not ans in ['y', 'n']:
+		ans = input('%s [y/n] ' % s)
+	#endwhile
+
+	return ans == 'y'
 #enddef
 
 def merge(fn1, fn2):
@@ -521,6 +526,25 @@ def main():
 				url = get_max_version_url(available_packages[package_name])
 			#endif
 
+			ver = get_package_version(get_package_fn(url))
+
+			logging.info('install %s-%s' % (package_name, ver))
+		#endfor
+
+		if not yes_no('continue?'):
+			return
+		#endif
+
+		for package in args['<package>']:
+			package_name = get_package_name(package)
+			package_version = get_package_version(package)
+
+			if package_version:
+				url = get_specific_version_url(available_packages[package_name], package_version)
+			else:
+				url = get_max_version_url(available_packages[package_name])
+			#endif
+
 			local_fn = download_package(url, cache_dir)
 			force = args['--force']
 			package_info = install_package(local_fn, prefix, force)
@@ -556,7 +580,30 @@ def main():
 				url = get_max_version_url(available_packages[package_name])
 			#endif
 
-			if LooseVersion(get_package_version(get_package_fn(url))) != LooseVersion(installed_packages[package_name]['version']): 
+			ver_cur = installed_packages[package_name]['version']
+			ver_avail = get_package_version(get_package_fn(url))
+			if LooseVersion(ver_avail) != LooseVersion(ver_cur): 
+				logging.info('update %s-%s -> %s-%s)' % (package_name, ver_cur, package_name, ver_avail))
+			#endif
+		#endfor
+
+		if not yes_no('continue?'):
+			return
+		#endif
+
+		for package in packages:
+			package_name = get_package_name(package)
+			package_version = get_package_version(package)
+
+			if package_version:
+				url = get_specific_version_url(available_packages[package_name], package_version)
+			else:
+				url = get_max_version_url(available_packages[package_name])
+			#endif
+
+			ver_cur = installed_packages[package_name]['version']
+			ver_avail = get_package_version(get_package_fn(url))
+			if LooseVersion(ver_avail) != LooseVersion(ver_cur): 
 				local_fn = download_package(url, cache_dir)
 				package_info = update_package(local_fn, installed_packages, prefix)
 				installed_packages[package_name] = package_info
@@ -593,18 +640,26 @@ def main():
 			mergeconfig_package(package, installed_packages, prefix)
 		#endfor
 	elif args['remove']:
-		for package in args['<package>']:
-			package_name = get_package_name(package)
-
+		for package_name in args['<package>']:
 			if not package_name in installed_packages:
 				logging.error('package %s not installed' % package_name)
 				return
 			#endif
 		#endfor
 
-		for package in args['<package>']:
-			remove_package(package, installed_packages, prefix)
-			del installed_packages[package]
+		for package_name in args['<package>']:
+			package_version = installed_packages[package_name]['version']
+
+			logging.info('remove %s-%s' % (package_name, package_version))
+		#endfor
+
+		if not yes_no('continue?'):
+			return
+		#endif
+
+		for package_name in args['<package>']:
+			remove_package(package_name, installed_packages, prefix)
+			del installed_packages[package_name]
 		#endfor
 
 		save_installed_packages(installed_packages, db_fn)
