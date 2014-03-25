@@ -11,7 +11,7 @@ setup(
 			'create_shared_zip': False,
 			'compressed': True,
 			'include_msvcr': True,
-			#'include_files': ['captions.cs', ]
+			'include_files': ['7za.exe', 'diff.exe', 'install.bat', 'vim.exe']
 		},
 	},
 	executables = [
