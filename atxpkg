@@ -583,7 +583,7 @@ def main():
 			ver_cur = installed_packages[package_name]['version']
 			ver_avail = get_package_version(get_package_fn(url))
 			if LooseVersion(ver_avail) != LooseVersion(ver_cur): 
-				logging.info('update %s-%s -> %s-%s)' % (package_name, ver_cur, package_name, ver_avail))
+				logging.info('update %s-%s -> %s-%s' % (package_name, ver_cur, package_name, ver_avail))
 			#endif
 		#endfor
 
