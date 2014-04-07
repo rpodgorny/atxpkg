@@ -20,6 +20,12 @@ setup(
 			appendScriptToExe=True,
 			appendScriptToLibrary=False,
 			compress=True,
+		),
+		Executable(
+			script='mkpkg',
+			appendScriptToExe=True,
+			appendScriptToLibrary=False,
+			compress=True,
 		)
 	]
 )
