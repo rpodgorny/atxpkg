@@ -213,7 +213,7 @@ def install_package(fn, prefix, force=False):
 			except: pass
 
 			logging.debug('I %s/%s' % (prefix, f))
-			try_delete('%s/%s' % (prefix, fn))
+			try_delete('%s/%s' % (prefix, f))
 			shutil.move(f, '%s/%s' % (prefix, f))
 		#endfor
 	finally:
@@ -537,6 +537,18 @@ def main():
 
 	if args['--prefix']:
 		prefix = args['--prefix']
+	#endif
+
+	if not os.path.isfile(db_fn):
+		logging.info('%s not found, creating empty one' % db_fn)
+		with open(db_fn, 'w') as f:
+			f.write('{}')
+		#endwith
+	#endif
+
+	if not os.path.isdir(cache_dir):
+		logging.info('%s not found, creating empty one' % cache_dir)
+		os.makedirs(cache_dir)
 	#endif
 
 	installed_packages = get_installed_packages(db_fn)
