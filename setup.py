@@ -11,7 +11,7 @@ setup(
 			'create_shared_zip': False,
 			'compressed': True,
 			'include_msvcr': True,
-			'include_files': ['7za.exe', 'diff.exe', 'install.bat', 'vim.exe']
+			'include_files': ['7za.exe', 'diff.exe', 'vim.exe']
 		},
 	},
 	executables = [
@@ -21,11 +21,10 @@ setup(
 			appendScriptToLibrary=False,
 			compress=True,
 		),
-		Executable(
-			script='mkpkg',
-			appendScriptToExe=True,
-			appendScriptToLibrary=False,
-			compress=True,
-		)
 	]
 )
+
+
+with open('.version', 'w') as f:
+	f.write('%s' % __version__)
+#endwith
