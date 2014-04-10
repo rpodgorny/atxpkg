@@ -142,6 +142,8 @@ def unzip(fn):
 
 # TODO: possibly use 'inuse.exe'
 def try_delete(fn):
+	if not os.path.isfile(fn): return
+
 	del_fn = '%s.atxpkg_delete' % fn
 	while os.path.isfile(del_fn):
 		try:
