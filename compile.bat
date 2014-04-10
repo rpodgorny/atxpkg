@@ -2,7 +2,7 @@ echo this is compile.bat v0.2
 
 setlocal
 
-set name=router
+set name=atxpkg
 set PYTHONPATH=../pylib;../libsh
 
 rd /s /q build
