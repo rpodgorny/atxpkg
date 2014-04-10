@@ -270,16 +270,25 @@ def update_package(fn, installed_packages, prefix):
 			except: pass
 
 			if os.path.isfile('%s/%s' % (prefix, f)):
+				skip = False
 				backup = False
+
 				if f in files_to_backup:
 					sum_current = get_md5sum('%s/%s' % (prefix, f))
 					sum_original = installed_package['md5sums'][f]
-					if sum_original != sum_current:
+
+					if sum_original == sum_new:
+						skip = True
+					elif sum_current == sum_new:
+						pass
+					else:
 						backup = True
 					#endif
 				#endif
 
-				if backup:
+				if skip:
+					logging.debug('S %s/%s' % (prefix, f))
+				elif backup:
 					logging.info('sum for file %s/%s changed, installing new version as %s/%s.atxpkg_new' % (prefix, f, prefix, f))
 					logging.debug('I %s/%s.atxpkg_new' % (prefix, f))
 					shutil.move(f, '%s/%s.atxpkg_new' % (prefix, f))
