@@ -23,8 +23,3 @@ setup(
 		),
 	]
 )
-
-
-with open('.version', 'w') as f:
-	f.write('%s' % __version__)
-#endwith
