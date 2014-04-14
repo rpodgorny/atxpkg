@@ -1,4 +1,4 @@
-echo this is compile.bat v0.2
+echo this is compile.bat v0.3
 
 setlocal
 
@@ -12,15 +12,17 @@ python setup.py install --prefix=dist
 
 rd /s /q pkg
 md pkg
-md pkg\%name%
-cp -av dist/* pkg/%name%/
+md pkg\atx300\%name%
+cp -av dist/* pkg/atx300/%name%/
 cp atxpkg_backup pkg/.atxpkg_backup
 
-;rem rd /s /q build
-;rem rd /s /q dist
+rd /s /q build
+rd /s /q dist
 
+hg parents --template "{latesttag}" >.version
 set /p version=<.version
 rm .version
+set version=%version:~1%
 
 ;rem no, i can't do this inside of the if for some reason - FUCK WINDOWS!
 awk "BEGIN {print strftime(\"%%Y%%m%%d%%H%%M%%S\")}" >.datetime
@@ -28,14 +30,12 @@ set /p datetime=<.datetime
 rm .datetime
 
 if "%1" == "" (
-	;rem awk "BEGIN {print strftime(\"%%Y%%m%%d%%H%%M%%S\")}" >.datetime
-	;rem set /p datetime=<.datetime
-	;rem rm .datetime
-
 	echo devel version %datetime%
-	set version=%version%a%datetime%
+
+	set name=%name%.dev
+	set version=%datetime%
 ) else if "%1" == "release" (
-	echo release version
+	echo release version %version%
 ) else (
 	echo unknown parameter!
 	goto end
@@ -49,7 +49,7 @@ cd pkg
 zip -r ../%pkg_fn% .
 cd ..
 
-;rem rd /s /q pkg
+rd /s /q pkg
 
 pscp %pkg_fn% radek@podgorny.cz:public_html/atxpkg/
 
