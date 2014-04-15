@@ -564,6 +564,8 @@ def main():
 
 	installed_packages = get_installed_packages(db_fn)
 
+	force = args['--force']
+
 	if args['install']:
 		available_packages = get_available_packages(repos)
 
@@ -575,7 +577,7 @@ def main():
 				return
 			#endif
 
-			if package_name in installed_packages:
+			if package_name in installed_packages and not force:
 				logging.error('package %s already installed' % package_name)
 				return
 			#endif
@@ -611,7 +613,6 @@ def main():
 			#endif
 
 			local_fn = download_package(url, cache_dir)
-			force = args['--force']
 			package_info = install_package(local_fn, prefix, force)
 			installed_packages[package_name] = package_info
 		#endfor
@@ -634,8 +635,6 @@ def main():
 		else:
 			packages = installed_packages.keys()
 		#endif
-
-		force = args['--force']
 
 		packages_to_update = set()
 
