@@ -226,7 +226,7 @@ def install_package(fn, prefix, force=False):
 	return ret
 #endif
 
-def update_package(fn, installed_packages, prefix):
+def update_package(fn, installed_packages, prefix, force=False):
 	name = get_package_name(get_package_fn(fn))
 	version_old = installed_packages[name]['version']
 	version_new = get_package_version(get_package_fn(fn))
@@ -255,11 +255,13 @@ def update_package(fn, installed_packages, prefix):
 
 		installed_package = installed_packages[name]
 
-		for f in files:
-			if os.path.isfile('%s/%s' % (prefix, f)) and not f in installed_package['md5sums']:
-				raise Exception('%s/%s exists in filesystem but is not part of original package' % (prefix, f))
-			#endif
-		#endfor
+		if not force:
+			for f in files:
+				if os.path.isfile('%s/%s' % (prefix, f)) and not f in installed_package['md5sums']:
+					raise Exception('%s/%s exists in filesystem but is not part of original package' % (prefix, f))
+				#endif
+			#endfor
+		#endif
 
 		for f in files:
 			if f.startswith('.atxpkg_'): continue
@@ -681,7 +683,7 @@ def main():
 			if LooseVersion(ver_avail) != LooseVersion(ver_cur) \
 			or force: 
 				local_fn = download_package(url, cache_dir)
-				package_info = update_package(local_fn, installed_packages, prefix)
+				package_info = update_package(local_fn, installed_packages, prefix, force)
 				installed_packages[package_name] = package_info
 			#endif
 		#endfor
