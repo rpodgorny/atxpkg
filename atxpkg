@@ -216,7 +216,8 @@ def install_package(fn, prefix, force=False):
 
 			logging.debug('I %s/%s' % (prefix, f))
 			try_delete('%s/%s' % (prefix, f))
-			shutil.move(f, '%s/%s' % (prefix, f))
+			#shutil.move(f, '%s/%s' % (prefix, f))
+			shutil.copy(f, '%s/%s' % (prefix, f))
 		#endfor
 	finally:
 		os.chdir(cwd)
@@ -295,16 +296,19 @@ def update_package(fn, installed_packages, prefix, force=False):
 				elif backup:
 					logging.info('sum for file %s/%s changed, installing new version as %s/%s.atxpkg_new' % (prefix, f, prefix, f))
 					logging.debug('I %s/%s.atxpkg_new' % (prefix, f))
-					shutil.move(f, '%s/%s.atxpkg_new' % (prefix, f))
+					#shutil.move(f, '%s/%s.atxpkg_new' % (prefix, f))
+					shutil.copy(f, '%s/%s.atxpkg_new' % (prefix, f))
 				else:
 					logging.debug('U %s/%s' % (prefix, f))
 					try_delete('%s/%s' % (prefix, f))
-					shutil.move(f, '%s/%s' % (prefix, f))
+					#shutil.move(f, '%s/%s' % (prefix, f))
+					shutil.copy(f, '%s/%s' % (prefix, f))
 				#endif
 			else:
 				logging.debug('I %s/%s' % (prefix, f))
 				try_delete('%s/%s' % (prefix, f))
-				shutil.move(f, '%s/%s' % (prefix, f))
+				#shutil.move(f, '%s/%s' % (prefix, f))
+				shutil.copy(f, '%s/%s' % (prefix, f))
 			#endif
 		#endfor
 
