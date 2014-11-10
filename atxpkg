@@ -35,6 +35,7 @@ import os
 import subprocess
 import hashlib
 from distutils.version import LooseVersion
+from bs4 import BeautifulSoup
 
 
 repos = [
@@ -94,13 +95,14 @@ def get_available_packages(repos):
 
 def parse_index_html(html):
 	ret = []
-	from bs4 import BeautifulSoup
+
 	soup = BeautifulSoup(html)
 	for tag in soup.findAll('a', href=True):
 		link = tag['href']
 		if not '.atxpkg.' in link: continue  # TODO: convert to more exact match
 		ret.append(link)
 	#endfor
+
 	return ret
 #enddef
 
