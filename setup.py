@@ -11,7 +11,7 @@ setup(
 			'create_shared_zip': False,
 			'compressed': True,
 			'include_msvcr': True,
-			'include_files': ['add_to_path.bat', '7za.exe', 'diff.exe', 'vim.exe']
+			'include_files': ['add_to_path.bat', '7za.exe', 'diff.exe', 'vim.exe'],
 		},
 	},
 	executables = [
