@@ -19,7 +19,8 @@ cp atxpkg_backup pkg/.atxpkg_backup
 rd /s /q build
 rd /s /q dist
 
-hg parents --template "{latesttag}" >.version
+;rem hg parents --template "{latesttag}" >.version
+git describe --tags --abbrev=0 >.version
 set /p version=<.version
 rm .version
 set version=%version:~1%
