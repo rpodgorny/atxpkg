@@ -16,6 +16,12 @@ md pkg\%name%
 cp -av dist/* pkg/%name%/
 cp atxpkg_backup pkg/.atxpkg_backup
 
+cp 7za.exe pkg/%name%/
+cp add_to_path.bat pkg/%name%/
+cp diff.exe pkg/%name%/
+cp setx.exe pkg/%name%/
+cp vim.exe pkg/%name%/
+
 rd /s /q build
 rd /s /q dist
 
