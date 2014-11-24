@@ -5,13 +5,13 @@ Asterix package manager.
 
 Usage:
   atxpkg install [--prefix=<path>] [--force] [options] <package>...
-  atxpkg update [--prefix=<path>] [--force] [<package>...]
-  atxpkg remove [--prefix=<path>] <package>...
-  atxpkg check [--prefix=<path>] [<package>...]
-  atxpkg merge_config [--prefix=<path>] [<package>...]
-  atxpkg list_installed
-  atxpkg show_untracked [<path>]
-  atxpkg clean_cache
+  atxpkg update [--prefix=<path>] [--force] [options] [<package>...]
+  atxpkg remove [--prefix=<path>] [options] <package>...
+  atxpkg check [--prefix=<path>] [options] [<package>...]
+  atxpkg merge_config [--prefix=<path>] [options] [<package>...]
+  atxpkg list_installed [options]
+  atxpkg show_untracked [options] [<path>]
+  atxpkg clean_cache [options]
 
 Options:
   --debug          Enable debug mode.
@@ -39,6 +39,8 @@ from distutils.version import LooseVersion
 
 
 def logging_setup(level):
+	sys.excepthook = lambda t, v, tb: logging.critical('unhandled exception', exc_info=(t, v, tb))
+
 	logging.basicConfig(level=level)
 #enddef
 
