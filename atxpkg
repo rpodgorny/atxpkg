@@ -4,7 +4,7 @@
 Asterix package manager.
 
 Usage:
-  atxpkg install [--prefix=<path>] [--force] <package>...
+  atxpkg install [--prefix=<path>] [--force] [options] <package>...
   atxpkg update [--prefix=<path>] [--force] [<package>...]
   atxpkg remove [--prefix=<path>] <package>...
   atxpkg check [--prefix=<path>] [<package>...]
@@ -14,6 +14,7 @@ Usage:
   atxpkg clean_cache
 
 Options:
+  --debug          Enable debug mode.
   --force          Force operation (overwrite files etc.)
   -h,--help        This screen.
   --prefix=<path>  Path prefix.
@@ -37,13 +38,22 @@ import hashlib
 from distutils.version import LooseVersion
 
 
-repos = [
-	'http://podgorny.cz/~radek/atxpkg',  # TODO: hard-coded shit
-]
-
-
 def logging_setup(level):
 	logging.basicConfig(level=level)
+#enddef
+
+
+def get_repos(fn):
+	ret = []
+
+	for line in open(fn, 'r'):
+		line = line.strip()
+		if line.startswith('#'): continue
+		if line.startswith(';'): continue
+		ret.append(line)
+	#endfor
+
+	return ret
 #enddef
 
 
@@ -99,7 +109,13 @@ def parse_index_html(html):
 
 def get_repo_listing(repo):
 	if repo.startswith('http://'):
-		r = urllib.request.urlopen(repo)
+		try:
+			r = urllib.request.urlopen(repo)
+		except:
+			logging.error('failed to get listing from %s' % repo)
+			return []
+		#endtry
+
 		files = parse_index_html(r.read().decode())
 		return ['%s/%s' % (repo, f) for f in files]
 	else:
@@ -527,20 +543,31 @@ def clean_cache(cache_dir):
 def main():
 	args = docopt.docopt(__doc__, version=__version__)
 
-	logging_setup('DEBUG')
+	debug = args['--debug']
+
+	if debug:
+		log_level = 'DEBUG'
+	else:
+		log_level = 'INFO'
+	#endif
+
+	logging_setup(log_level)
 
 	if sys.platform == 'win32':
 		logging.debug('detected win32')
 
 		db_fn = '/atxpkg/installed.json'
+		repos_fn = '/atxpkg/repos.txt'
 		prefix = ''
 		cache_dir = '/atxpkg/cache'
 	else:
 		db_fn = '/tmp/atxpkg/installed.json'
+		repos_fn = '/tmp/atxpkg/repos.txt'
 		prefix = ''
 		cache_dir = '/tmp/atxpkg/cache'
 	#endif
 
+	repos = get_repos(repos_fn)
 	repos.append(cache_dir)
 
 	#logging.debug(str(args))

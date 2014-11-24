@@ -1,0 +1,3 @@
+http://atxpkg.asterix.cz
+http://atxpkg-dev.asterix.cz
+http://podgorny.cz/~radek/atxpkg
