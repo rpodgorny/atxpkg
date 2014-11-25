@@ -670,6 +670,11 @@ def main():
 			package_name = get_package_name(package)
 			package_version = get_package_version(package)
 
+			if not package_name in available_packages:
+				logging.warning('%s not available in any repository' % package_name)
+				continue
+			#endif
+
 			if package_version:
 				url = get_specific_version_url(available_packages[package_name], package_version)
 			else:
