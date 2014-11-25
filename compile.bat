@@ -19,6 +19,7 @@ cp atxpkg_backup pkg/.atxpkg_backup
 cp 7za.exe pkg/%name%/
 cp add_to_path.bat pkg/%name%/
 cp diff.exe pkg/%name%/
+cp repos.txt pkg/%name%/
 cp setx.exe pkg/%name%/
 cp vim.exe pkg/%name%/
 
@@ -41,8 +42,10 @@ if "%1" == "" (
 
 	set name=%name%.dev
 	set version=%datetime%
+	set upload=atxpkg@atxpkg-dev.asterix.cz:atxpkg/
 ) else if "%1" == "release" (
 	echo release version %version%
+	set upload=atxpkg@atxpkg.asterix.cz:atxpkg/
 ) else (
 	echo unknown parameter!
 	goto end
@@ -58,6 +61,6 @@ cd ..
 
 rd /s /q pkg
 
-pscp %pkg_fn% radek@podgorny.cz:public_html/atxpkg/
+pscp %pkg_fn% %upload%
 
 :end
