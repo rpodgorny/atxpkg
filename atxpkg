@@ -150,7 +150,7 @@ def download_package(url, cache_dir):
 def unzip(fn):
 	#cmd = 'unzip -q %s' % (fn, )
 	cmd = '/atxpkg/7za x %s' % fn  # TODO: hard-coded shit
-	subprocess.call(cmd, shell=True)
+	subprocess.check_call(cmd, shell=True)
 #enddef
 
 
