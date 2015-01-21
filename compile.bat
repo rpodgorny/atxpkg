@@ -19,6 +19,7 @@ cp atxpkg_backup pkg/.atxpkg_backup
 cp add_to_path.bat pkg/%name%/
 cp atxpkg_7za.exe pkg/%name%/
 cp atxpkg_diff.exe pkg/%name%/
+cp atxpkg_sdiff.exe pkg/%name%/
 cp atxpkg_setx.exe pkg/%name%/
 cp atxpkg_vim.exe pkg/%name%/
 cp repos.txt pkg/%name%/
