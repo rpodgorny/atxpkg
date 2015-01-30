@@ -9,6 +9,7 @@ Usage:
   atxpkg remove [--prefix=<path>] [options] <package>...
   atxpkg check [--prefix=<path>] [options] [<package>...]
   atxpkg merge_config [--prefix=<path>] [--from-backup] [options] [<package>...]
+  atxpkg list_available [options]
   atxpkg list_installed [options]
   atxpkg show_untracked [options] [<path>]
   atxpkg clean_cache [options]
@@ -785,6 +786,12 @@ def main():
 		#endfor
 
 		save_installed_packages(installed_packages, db_fn)
+	elif args['list_available']:
+		available_packages = get_available_packages(repos)
+
+		for package_name in sorted(available_packages.keys()):
+			print(package_name)
+		#endfor
 	elif args['list_installed']:
 		for package_name, package_info in installed_packages.items():
 			package_version = package_info['version']
