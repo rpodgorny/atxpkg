@@ -149,12 +149,12 @@ def download_package(url, cache_dir):
 
 def unzip(fn):
 	#cmd = 'unzip -q %s' % (fn, )
-	cmd = '/atxpkg/7za x %s' % fn  # TODO: hard-coded shit
+	cmd = '/atxpkg/atxpkg_7za.exe x %s' % fn  # TODO: hard-coded shit
 	subprocess.check_call(cmd, shell=True)
 #enddef
 
 
-# TODO: possibly use 'inuse.exe'
+# TODO: possibly use 'atxpkg_inuse.exe'
 def try_delete(fn):
 	if not os.path.isfile(fn): return
 
@@ -473,12 +473,12 @@ def yes_no(s, default=None):
 #enddef
 
 def merge(fn1, fn2):
-	cmd = '/atxpkg/vim.exe -d %s %s' % (fn1, fn2)
+	cmd = '/atxpkg/atxpkg_vim.exe -d %s %s' % (fn1, fn2)
 	return subprocess.call(cmd, shell=True) == 0
 #enddef
 
 #def diff(fn1, fn2):
-#	cmd = '/atxpkg/diff.exe -u %s %s' % (fn1, fn2)
+#	cmd = '/atxpkg/atxpkg_diff.exe -u %s %s' % (fn1, fn2)
 #	return subprocess.call(cmd, shell=True)
 #enddef
 
