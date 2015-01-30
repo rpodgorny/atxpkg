@@ -71,6 +71,12 @@ def get_available_packages(repos):
 
 		for package_url in package_urls:
 			package_fn = get_package_fn(package_url)
+
+			if not is_valid_package_fn(package_fn):
+				logging.debug('%s not valid package name' % package_url)
+				continue
+			#endif
+
 			package_name = get_package_name(package_fn)
 			package_version = get_package_version(package_fn)
 			#print(package_name, package_version)
