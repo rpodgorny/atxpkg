@@ -8,16 +8,13 @@ def get_package_fn(url):
 
 def get_package_name(fn):
 	fn = re.sub('\.atxpkg\..*', '', fn)
-	return fn.split('-', 1)[0]
+	name, ver, rel = fn.rsplit('-', 2)
+	return name
 #enddef
 
 
 def get_package_version(fn):
 	fn = re.sub('\.atxpkg\..*', '', fn)
-
-	if '-' in fn:
-		return fn.rsplit('-', 1)[1]
-	else:
-		return None
-	#endif
+	name, ver, rel = fn.rsplit('-', 2)
+	return '%s-%s' % (ver, rel)
 #enddef
