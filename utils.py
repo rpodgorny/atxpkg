@@ -2,11 +2,15 @@ import re
 from distutils.version import LooseVersion
 
 def get_max_version_url(urls):
-	return sorted(urls, key=lambda x: LooseVersion(get_package_version(get_package_fn(x))))[-1]
+	map_ = {get_package_version(get_package_fn(url)): url for url in urls}
+	# TODO: replacing '-' with '.' is a hack. looseversion is unable to handle it otherwise
+	max_version = sorted(map_.keys(), key=lambda x: LooseVersion(x.replace('-', '.')))[-1]
+	return map_[max_version]
 #enddef
 
 def get_package_fn(url):
-	return url.split('/')[-1]
+	fn = url.split('/')[-1]
+	return fn
 #enddef
 
 # TODO: fn is not really fn here

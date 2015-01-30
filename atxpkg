@@ -137,9 +137,11 @@ def download_package(url, cache_dir):
 #enddef
 
 def unzip(fn):
+	logging.info('unzipping %s' % fn)
+
 	#cmd = 'unzip -q %s' % (fn, )
 	cmd = '/atxpkg/atxpkg_7za.exe x %s' % fn  # TODO: hard-coded shit
-	subprocess.check_call(cmd, shell=True)
+	subprocess.check_call(cmd, shell=True, stdout=subprocess.DEVNULL)
 #enddef
 
 
@@ -678,8 +680,7 @@ def main():
 
 			ver_cur = installed_packages[package_name]['version']
 			ver_avail = get_package_version(get_package_fn(url))
-			if LooseVersion(ver_avail) != LooseVersion(ver_cur) \
-			or force: 
+			if ver_avail != ver_cur or force: 
 				logging.info('update %s-%s -> %s-%s' % (package_name, ver_cur, package_name, ver_avail))
 				packages_to_update.add(package)
 			#endif
