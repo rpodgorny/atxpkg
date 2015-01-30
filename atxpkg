@@ -510,11 +510,6 @@ def save_installed_packages(l, db_fn):
 	json.dump(l, open(db_fn, 'w'), indent=4)
 #enddef
 
-
-def get_max_version_url(urls):
-	return sorted(urls, key=lambda x: LooseVersion(get_package_version(get_package_fn(x))))[-1]
-#enddef
-
 def get_specific_version_url(urls, version):
 	for url in urls:
 		if get_package_version(get_package_fn(url)) == version:
