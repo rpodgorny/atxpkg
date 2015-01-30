@@ -3,6 +3,8 @@ echo this is compile.bat v0.3
 setlocal
 
 set name=atxpkg
+set pkgrel=1
+
 set PYTHONPATH=../pylib;../libsh
 
 rd /s /q build
@@ -52,7 +54,7 @@ if "%1" == "" (
 	goto end
 )
 
-set pkg_fn=%name%-%version%.atxpkg.zip
+set pkg_fn=%name%-%version%-%pkgrel%.atxpkg.zip
 
 rm %pkg_fn%
 
