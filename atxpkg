@@ -113,6 +113,7 @@ def get_repo_listing(repo):
 		return ['%s/%s' % (repo, f) for f in files]
 	else:
 		lst = glob.glob('%s/*' % repo)
+		lst = [i.replace('\\', '/') for i in lst]
 		lst = [i for i in lst if '.atxpkg.' in i]  # TODO: convert to more exact match
 		return lst
 	#endif
