@@ -10,7 +10,7 @@ set PYTHONPATH=../pylib;../libsh
 rd /s /q build
 rd /s /q dist
 
-python setup.py install --prefix=dist
+python setup_win.py install --prefix=dist
 
 rd /s /q pkg
 md pkg
