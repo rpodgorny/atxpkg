@@ -47,6 +47,11 @@ def logging_setup(level):
 #enddef
 
 
+def print_(str):
+	print(str)
+	logging.info(str)
+#enddef
+
 def get_repos(fn):
 	ret = []
 
@@ -124,10 +129,10 @@ def download_package(url, cache_dir):
 		fn = '%s/%s' % (cache_dir, get_package_fn(url))
 
 		if not os.path.isfile(fn):
-			logging.info('downloading %s to %s' % (url, fn))
+			print_('downloading %s to %s' % (url, fn))
 			urllib.request.urlretrieve(url, fn)
 		else:
-			logging.info('using cached %s' % fn)
+			print_('using cached %s' % fn)
 		#endif
 
 		return fn
@@ -137,10 +142,11 @@ def download_package(url, cache_dir):
 #enddef
 
 def unzip(fn):
-	logging.info('unzipping %s' % fn)
+	print_('unzipping %s' % fn)
 
 	#cmd = 'unzip -q %s' % (fn, )
 	cmd = '/atxpkg/atxpkg_7za.exe x %s' % fn  # TODO: hard-coded shit
+	logging.debug(cmd)
 	subprocess.check_call(cmd, shell=True, stdout=subprocess.DEVNULL)
 #enddef
 
@@ -174,7 +180,7 @@ def install_package(fn, prefix, force=False):
 	name = get_package_name(get_package_fn(fn))
 	version_new = get_package_version(get_package_fn(fn))
 
-	logging.info('installing %s: %s' % (name, version_new))
+	print_('installing %s: %s' % (name, version_new))
 
 	ret = {}
 	ret['version'] = get_package_version(get_package_fn(fn))
@@ -237,7 +243,7 @@ def update_package(fn, installed_packages, prefix, force=False):
 	version_old = installed_packages[name]['version']
 	version_new = get_package_version(get_package_fn(fn))
 
-	logging.info('updating %s: %s -> %s' % (name, version_old, version_new))
+	print_('updating %s: %s -> %s' % (name, version_old, version_new))
 
 	ret = {}
 	ret['version'] = version_new
@@ -299,7 +305,7 @@ def update_package(fn, installed_packages, prefix, force=False):
 				if skip:
 					logging.debug('S %s/%s' % (prefix, f))
 				elif backup:
-					logging.info('sum for file %s/%s changed, installing new version as %s/%s.atxpkg_new' % (prefix, f, prefix, f))
+					print_('sum for file %s/%s changed, installing new version as %s/%s.atxpkg_new' % (prefix, f, prefix, f))
 					logging.debug('I %s/%s.atxpkg_new' % (prefix, f))
 					#shutil.move(f, '%s/%s.atxpkg_new' % (prefix, f))
 					shutil.copy(f, '%s/%s.atxpkg_new' % (prefix, f))
@@ -343,7 +349,7 @@ def update_package(fn, installed_packages, prefix, force=False):
 			#endif
 
 			if backup:
-				logging.info('saving changed %s/%s as %s/%s.atxpkg_save' % (prefix, fn, prefix, fn))
+				print_('saving changed %s/%s as %s/%s.atxpkg_save' % (prefix, fn, prefix, fn))
 				logging.debug('S %s/%s %s/%s.atxpkg_save' % (prefix, fn, prefix, fn))
 				shutil.move('%s/%s' % (prefix, fn), '%s/%s.atxpkg_save' % (prefix, fn))
 			else:
@@ -365,7 +371,7 @@ def update_package(fn, installed_packages, prefix, force=False):
 
 def remove_package(package_name, installed_packages, prefix):
 	version = installed_packages[package_name]['version']
-	logging.info('removing package %s: %s' % (package_name, version))
+	print_('removing package %s: %s' % (package_name, version))
 
 	package_info = installed_packages[package_name]
 
@@ -391,7 +397,7 @@ def remove_package(package_name, installed_packages, prefix):
 		#endif
 
 		if backup:
-			logging.info('%s/%s changed, keeping old backup' % (prefix, fn))
+			print_('%s/%s changed, keeping old backup' % (prefix, fn))
 			logging.debug('M %s/%s %s/%s.atxpkg_backup' % (prefix, fn, prefix, fn))
 			os.rename('%s/%s' % (prefix, fn), '%s/%s.atxpkg_backup' % (prefix, fn))
 		else:
@@ -576,14 +582,14 @@ def main():
 	#endif
 
 	if not os.path.isfile(db_fn):
-		logging.info('%s not found, creating empty one' % db_fn)
+		print_('%s not found, creating empty one' % db_fn)
 		with open(db_fn, 'w') as f:
 			f.write('{}')
 		#endwith
 	#endif
 
 	if not os.path.isdir(cache_dir):
-		logging.info('%s not found, creating empty one' % cache_dir)
+		print_('%s not found, creating empty one' % cache_dir)
 		os.makedirs(cache_dir)
 	#endif
 
@@ -620,7 +626,7 @@ def main():
 
 			ver = get_package_version(get_package_fn(url))
 
-			logging.info('install %s-%s' % (package_name, ver))
+			print_('install %s-%s' % (package_name, ver))
 		#endfor
 
 		if not yes_no('continue?', default='y'):
@@ -681,13 +687,13 @@ def main():
 			ver_cur = installed_packages[package_name]['version']
 			ver_avail = get_package_version(get_package_fn(url))
 			if ver_avail != ver_cur or force: 
-				logging.info('update %s-%s -> %s-%s' % (package_name, ver_cur, package_name, ver_avail))
+				print_('update %s-%s -> %s-%s' % (package_name, ver_cur, package_name, ver_avail))
 				packages_to_update.add(package)
 			#endif
 		#endfor
 
 		if not packages_to_update:
-			logging.info('nothing to update')
+			print_('nothing to update')
 			return
 		#endif
 
@@ -757,7 +763,7 @@ def main():
 		for package_name in args['<package>']:
 			package_version = installed_packages[package_name]['version']
 
-			logging.info('remove %s-%s' % (package_name, package_version))
+			print_('remove %s-%s' % (package_name, package_version))
 		#endfor
 
 		if not yes_no('continue?', default='n'):
