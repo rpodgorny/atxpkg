@@ -40,13 +40,6 @@ from distutils.version import LooseVersion
 from utils import *
 
 
-def logging_setup(level):
-	sys.excepthook = lambda t, v, tb: logging.critical('unhandled exception', exc_info=(t, v, tb))
-
-	logging.basicConfig(level=level)
-#enddef
-
-
 def print_(str):
 	print(str)
 	logging.info(str)
@@ -563,7 +556,12 @@ def main():
 		log_level = 'INFO'
 	#endif
 
-	logging_setup(log_level)
+	# TODO: HACK - let's remove this when thing stabilize
+	log_level = 'DEBUG'
+
+	logging_setup(log_level, 'atxpkg.log', print_=False)
+
+	logging.info('starting atxpkg v%s' % __version__)
 
 	if sys.platform == 'win32':
 		logging.debug('detected win32')
@@ -795,9 +793,16 @@ def main():
 	elif args['clean_cache']:
 		clean_cache(cache_dir)
 	#endif
+
+	return 0
 #enddef
 
 
 if __name__ == '__main__':
-	main()
+	try:
+		sys.exit(main())
+	except:
+		print('ERROR occured!!! See log for details.')
+		raise
+	#endif
 #endif
