@@ -801,8 +801,8 @@ def main():
 if __name__ == '__main__':
 	try:
 		sys.exit(main())
-	except:
-		print('ERROR occured!!! See log for details.')
+	except Exception as e:
+		print('ERROR: %s' % str(e))
 		raise
 	#endif
 #endif
