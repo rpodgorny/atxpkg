@@ -220,6 +220,13 @@ def install_package(fn, prefix, force=False):
 		for f in files:
 			if f.startswith('.atxpkg_'): continue
 
+			if os.path.isfile('%s/%s' % (prefix, f)) and f in files_to_backup:
+				# TODO: only backup when sum differs
+				print_('saving untracked %s/%s as %s/%s.atxpkg_save' % (prefix, f, prefix, f))
+				logging.debug('S %s/%s %s/%s.atxpkg_save' % (prefix, f, prefix, f))
+				shutil.move('%s/%s' % (prefix, f), '%s/%s.atxpkg_save' % (prefix, f))
+			#endif
+
 			ret['md5sums'][f] = get_md5sum(f)
 			try:
 				os.makedirs(os.path.dirname('%s/%s' % (prefix, f)))
