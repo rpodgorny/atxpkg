@@ -543,6 +543,18 @@ def clean_cache(cache_dir):
 	#endfor
 #enddef
 
+def gen_fn_to_package_name_mapping(installed_packages, prefix):
+	ret = {}
+
+	for package_name, package_info in installed_packages.items():
+		for fn in package_info['md5sums'].keys():
+			ret['%s/%s' % (prefix, fn)] = package_name
+		#endfor
+	#endfor
+
+	return ret
+#enddef
+
 def main():
 	args = docopt.docopt(__doc__, version=__version__)
 
@@ -787,6 +799,24 @@ def main():
 			package_version = package_info['version']
 
 			print_('%s-%s' % (package_name, package_version))
+		#endfor
+	elif args['show_untracked']:
+		fn_to_package_name = gen_fn_to_package_name_mapping(installed_packages, prefix)
+		if args['<path>']:
+			paths = set([args['<path>'], ])
+		else:
+			paths = set()
+			for fn in fn_to_package_name.keys():
+				paths.add(os.path.dirname(fn))
+			#endfor
+		#endif
+
+		for path in paths:
+			for fn in os.listdir(path):
+				if os.path.isdir('%s/%s' % (path, fn)): continue
+				if '%s/%s' % (path, fn) in fn_to_package_name: continue
+				print('%s/%s' % (path, fn))
+			#endfor
 		#endfor
 	elif args['clean_cache']:
 		clean_cache(cache_dir)
