@@ -19,6 +19,7 @@ Options:
   --force          Force operation (overwrite files etc.)
   -h,--help        This screen.
   --prefix=<path>  Path prefix.
+  --recursive      Recurse to directories.
 
 '''
 
@@ -795,6 +796,8 @@ def main():
 			print_('%s-%s' % (package_name, package_version))
 		#endfor
 	elif args['show_untracked']:
+		recursive = args['--recursive']
+
 		fn_to_package_name = gen_fn_to_package_name_mapping(installed_packages, prefix)
 
 		if args['<path>']:
@@ -806,13 +809,25 @@ def main():
 			#endfor
 		#endif
 
-		for path in paths:
-			for fn in os.listdir(path):
-				if os.path.isdir('%s/%s' % (path, fn)): continue
-				if '%s/%s' % (path, fn) in fn_to_package_name: continue
-				print('%s/%s' % (path, fn))
+		while paths:
+			for path in paths.copy():
+				for fn in os.listdir(path):
+					if os.path.isdir('%s/%s' % (path, fn)):
+						if recursive:
+							paths.add('%s/%s' % (path, fn))
+						else:
+							continue
+						#endif
+					#endif
+
+					if '%s/%s' % (path, fn) in fn_to_package_name: continue
+
+					print('%s/%s' % (path, fn))
+				#endfor
+
+				paths.remove(path)
 			#endfor
-		#endfor
+		#endwhile
 	elif args['clean_cache']:
 		clean_cache(cache_dir)
 	#endif
