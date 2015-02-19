@@ -238,9 +238,9 @@ def install_package(fn, prefix, force=False):
 	return ret
 #endif
 
-def update_package(fn, installed_packages, prefix, force=False):
+def update_package(fn, installed_package, prefix, force=False):
 	name = get_package_name(get_package_fn(fn))
-	version_old = installed_packages[name]['version']
+	version_old = installed_package['version']
 	version_new = get_package_version(get_package_fn(fn))
 
 	print_('updating %s: %s -> %s' % (name, version_old, version_new))
@@ -264,8 +264,6 @@ def update_package(fn, installed_packages, prefix, force=False):
 		ret['backup'] = files_to_backup
 
 		dirs, files = get_recursive_listing(tmpdir)
-
-		installed_package = installed_packages[name]
 
 		if not force:
 			for f in files:
@@ -720,7 +718,7 @@ def main():
 			if LooseVersion(ver_avail) != LooseVersion(ver_cur) \
 			or force: 
 				local_fn = download_package(url, cache_dir)
-				package_info = update_package(local_fn, installed_packages, prefix, force)
+				package_info = update_package(local_fn, installed_packages[package_name], prefix, force)
 				installed_packages[package_name] = package_info
 				save_installed_packages(installed_packages, db_fn)
 			#endif
