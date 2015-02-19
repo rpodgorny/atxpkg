@@ -646,9 +646,8 @@ def main():
 			local_fn = download_package(url, cache_dir)
 			package_info = install_package(local_fn, prefix, force)
 			installed_packages[package_name] = package_info
+			save_installed_packages(installed_packages, db_fn)
 		#endfor
-
-		save_installed_packages(installed_packages, db_fn)
 	elif args['update']:
 		available_packages = get_available_packages(repos)
 
@@ -718,10 +717,9 @@ def main():
 				local_fn = download_package(url, cache_dir)
 				package_info = update_package(local_fn, installed_packages, prefix, force)
 				installed_packages[package_name] = package_info
+				save_installed_packages(installed_packages, db_fn)
 			#endif
 		#endfor
-
-		save_installed_packages(installed_packages, db_fn)
 	elif args['merge_config']:
 		from_backup = args['--from-backup']
 
@@ -773,20 +771,19 @@ def main():
 		for package_name in args['<package>']:
 			remove_package(package_name, installed_packages, prefix)
 			del installed_packages[package_name]
+			save_installed_packages(installed_packages, db_fn)
 		#endfor
-
-		save_installed_packages(installed_packages, db_fn)
 	elif args['list_available']:
 		available_packages = get_available_packages(repos)
 
 		for package_name in sorted(available_packages.keys()):
-			print(package_name)
+			print_(package_name)
 		#endfor
 	elif args['list_installed']:
 		for package_name, package_info in installed_packages.items():
 			package_version = package_info['version']
 
-			logging.info('%s-%s' % (package_name, package_version))
+			print_('%s-%s' % (package_name, package_version))
 		#endfor
 	elif args['clean_cache']:
 		clean_cache(cache_dir)
