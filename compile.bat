@@ -5,8 +5,6 @@ setlocal
 set name=atxpkg
 set pkgrel=1
 
-set PYTHONPATH=../pylib;../libsh
-
 rd /s /q build
 rd /s /q dist
 
