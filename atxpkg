@@ -802,6 +802,7 @@ def main():
 		#endfor
 	elif args['show_untracked']:
 		fn_to_package_name = gen_fn_to_package_name_mapping(installed_packages, prefix)
+
 		if args['<path>']:
 			paths = set([args['<path>'], ])
 		else:
