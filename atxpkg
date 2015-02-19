@@ -619,13 +619,11 @@ def main():
 			package_name = get_package_name(package)
 
 			if not package_name in available_packages:
-				logging.error('unable to find package %s' % package_name)
-				return
+				raise Exception('unable to find package %s' % package_name)
 			#endif
 
 			if package_name in installed_packages and not force:
-				logging.error('package %s already installed' % package_name)
-				return
+				raise Exception('package %s already installed' % package_name)
 			#endif
 		#endfor
 
@@ -673,8 +671,7 @@ def main():
 				package_name = get_package_name(package)
 
 				if not package_name in installed_packages:
-					logging.error('package %s not installed' % package_name)
-					return
+					raise Exception('package %s not installed' % package_name)
 				#endif
 			#endfor
 		else:
@@ -745,8 +742,7 @@ def main():
 				package_name = get_package_name(package)
 
 				if not package_name in installed_packages:
-					logging.error('package %s not installed' % package_name)
-					return
+					raise Exception('package %s not installed' % package_name)
 				#endif
 			#endfor
 		else:
@@ -757,8 +753,7 @@ def main():
 			package_name = get_package_name(package)
 
 			if not package_name in installed_packages:
-				logging.error('package %s not installed' % package_name)
-				return
+				raise Exception('package %s not installed' % package_name)
 			#endif
 		#endfor
 
@@ -768,8 +763,7 @@ def main():
 	elif args['remove']:
 		for package_name in args['<package>']:
 			if not package_name in installed_packages:
-				logging.error('package %s not installed' % package_name)
-				return
+				raise Exception('package %s not installed' % package_name)
 			#endif
 		#endfor
 
