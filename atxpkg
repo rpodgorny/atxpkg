@@ -8,10 +8,10 @@ Usage:
   atxpkg update [--prefix=<path>] [--force] [options] [<package>...]
   atxpkg remove [--prefix=<path>] [options] <package>...
   atxpkg check [--prefix=<path>] [options] [<package>...]
-  atxpkg merge_config [--prefix=<path>] [--from-backup] [options] [<package>...]
+  atxpkg merge_config [--prefix=<path>] [options] [<package>...]
   atxpkg list_available [options]
   atxpkg list_installed [options]
-  atxpkg show_untracked [options] [<path>]
+  atxpkg show_untracked [options] [--recursive] [<path>]
   atxpkg clean_cache [options]
 
 Options:
@@ -410,7 +410,7 @@ def remove_package(package_name, installed_packages, prefix):
 	#endfor
 #enddef
 
-def mergeconfig_package(package_name, installed_packages, prefix, from_backup=False):
+def mergeconfig_package(package_name, installed_packages, prefix):
 	package_info = installed_packages[package_name]
 
 	if 'backup' in package_info:
@@ -420,27 +420,26 @@ def mergeconfig_package(package_name, installed_packages, prefix, from_backup=Fa
 	#endif
 
 	for fn in files_to_backup:
-		fn_full = '%s/%s' % (prefix, fn)
+		for suffix in ['atxpkg_backup', 'atxpkg_new', 'atxpkg_save']:
+			fn_full = '%s/%s' % (prefix, fn)
+			fn_from_full = '%s.%s' % (fn_full, suffix)
 
-		if from_backup:
-			fn_from_full = '%s.atxpkg_backup' % fn_full
-		else:
-			fn_from_full = '%s.atxpkg_new' % fn_full
-		#endif
+			if os.path.isfile(fn_from_full):
+				logging.debug('found %s, running merge' % fn_from_full)
 
-		if os.path.isfile(fn_from_full):
-			logging.debug('found %s, running merge' % fn_from_full)
+				if yes_no('found %s, merge?' % fn_from_full, 'y'):
+					merge(fn_full, fn_from_full)
 
-			merge(fn_full, fn_from_full)
+					# just prints the diff
+					#diff(fn_full, fn_from_full)
 
-			# just prints the diff
-			#diff(fn_full, fn_from_full)
-
-			if yes_no('delete %s?' % fn_from_full):
-				logging.debug('D %s' % fn_from_full)
-				os.remove(fn_from_full)
+					if yes_no('delete %s?' % fn_from_full):
+						logging.debug('D %s' % fn_from_full)
+						os.remove(fn_from_full)
+					#endif
+				#endif
 			#endif
-		#endif
+		#endfor
 	#endfor
 #enddef
 
@@ -734,8 +733,6 @@ def main():
 			#endif
 		#endfor
 	elif args['merge_config']:
-		from_backup = args['--from-backup']
-
 		if args['<package>']:
 			packages = args['<package>']
 
@@ -759,7 +756,7 @@ def main():
 		#endfor
 
 		for package in packages:
-			mergeconfig_package(package, installed_packages, prefix, from_backup)
+			mergeconfig_package(package, installed_packages, prefix)
 		#endfor
 	elif args['remove']:
 		for package_name in args['<package>']:
