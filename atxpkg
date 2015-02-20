@@ -685,6 +685,7 @@ def main():
 			package_version = get_package_version(package)
 
 			if not package_name in available_packages:
+				print('%s not available in any repository' % package_name)
 				logging.warning('%s not available in any repository' % package_name)
 				continue
 			#endif
