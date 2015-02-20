@@ -569,7 +569,7 @@ def main():
 	# TODO: HACK - let's remove this when thing stabilize
 	log_level = 'DEBUG'
 
-	logging_setup(log_level, 'atxpkg.log', print_=False)
+	logging_setup(log_level, print_=False)
 
 	logging.info('starting atxpkg v%s' % __version__)
 
