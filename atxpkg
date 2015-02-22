@@ -20,6 +20,7 @@ Options:
   -h,--help        This screen.
   --prefix=<path>  Path prefix.
   --recursive      Recurse to directories.
+  --yes            Automatically answer yes to some questions.
 
 '''
 
@@ -611,6 +612,7 @@ def main():
 	installed_packages = get_installed_packages(db_fn)
 
 	force = args['--force']
+	yes = args['--yes']
 
 	if args['install']:
 		available_packages = get_available_packages(repos)
@@ -642,7 +644,7 @@ def main():
 			print_('install %s-%s' % (package_name, ver))
 		#endfor
 
-		if not yes_no('continue?', default='y'):
+		if not (yes or yes_no('continue?', default='y')):
 			return
 		#endif
 
@@ -708,7 +710,7 @@ def main():
 			return
 		#endif
 
-		if not yes_no('continue?', default='y'):
+		if not (yes or yes_no('continue?', default='y')):
 			return
 		#endif
 
@@ -771,7 +773,7 @@ def main():
 			print_('remove %s-%s' % (package_name, package_version))
 		#endfor
 
-		if not yes_no('continue?', default='n'):
+		if not (yes or yes_no('continue?', default='n')):
 			return
 		#endif
 
