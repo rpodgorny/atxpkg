@@ -182,7 +182,7 @@ def install_package(fn, prefix, force=False):
 	name = get_package_name(get_package_fn(fn))
 	version_new = get_package_version(get_package_fn(fn))
 
-	print_('installing %s: %s' % (name, version_new))
+	print_('installing %s-%s' % (name, version_new))
 
 	ret = {}
 	ret['version'] = get_package_version(get_package_fn(fn))
