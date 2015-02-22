@@ -42,6 +42,13 @@ from distutils.version import LooseVersion
 from utils import *
 
 
+if sys.platform == 'win32':
+	BIN_7ZIP = '/atxpkg/atxpkg_7za.exe'
+else:
+	BIN_7ZIP = '7za'
+#endif
+
+
 def print_(str):
 	print(str)
 	logging.info(str)
@@ -140,7 +147,7 @@ def unzip(fn):
 	print_('unzipping %s' % fn)
 
 	#cmd = 'unzip -q %s' % (fn, )
-	cmd = '/atxpkg/atxpkg_7za.exe x %s' % fn  # TODO: hard-coded shit
+	cmd = '%s x %s' % (BIN_7ZIP, fn)
 	logging.debug(cmd)
 	subprocess.check_call(cmd, shell=True, stdout=subprocess.DEVNULL)
 #enddef
