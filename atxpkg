@@ -240,12 +240,12 @@ def install_package(fn, prefix, force=False):
 	return ret
 #endif
 
-def update_package(fn, installed_package, prefix, force=False):
+def update_package(fn, name_old, installed_package, prefix, force=False):
 	name = get_package_name(get_package_fn(fn))
 	version_old = installed_package['version']
 	version_new = get_package_version(get_package_fn(fn))
 
-	print_('updating %s: %s -> %s' % (name, version_old, version_new))
+	print_('updating %s-%s -> %s-%s' % (name_old, version_old, name, version_new))
 
 	ret = {}
 	ret['version'] = version_new
@@ -670,10 +670,16 @@ def main():
 			packages = args['<package>']
 
 			for package in packages:
-				package_name = get_package_name(package)
+				if '..' in package:
+					package_old, package_new = package.split('..')
+					package_name_old = get_package_name(package_old)
+					package_name_new = get_package_name(package_new)
+				else:
+					package_name_old = package_name_new = get_package_name(package)
+				#endif
 
-				if not package_name in installed_packages:
-					raise Exception('package %s not installed' % package_name)
+				if not package_name_old in installed_packages:
+					raise Exception('package %s not installed' % package_name_old)
 				#endif
 			#endfor
 		else:
@@ -683,24 +689,31 @@ def main():
 		packages_to_update = set()
 
 		for package in packages:
-			package_name = get_package_name(package)
-			package_version = get_package_version(package)
+			if '..' in package:
+				package_old, package_new = package.split('..')
+				package_name_old = get_package_name(package_old)
+				package_name_new = get_package_name(package_new)
+				package_version = get_package_version(package_new)
+			else:
+				package_name_old = package_name_new = get_package_name(package)
+				package_version = get_package_version(package)
+			#endif
 
-			if not package_name in available_packages:
-				logging.warning('%s not available in any repository' % package_name)
+			if not package_name_new in available_packages:
+				logging.warning('%s not available in any repository' % package_name_new)
 				continue
 			#endif
 
 			if package_version:
-				url = get_specific_version_url(available_packages[package_name], package_version)
+				url = get_specific_version_url(available_packages[package_name_new], package_version)
 			else:
-				url = get_max_version_url(available_packages[package_name])
+				url = get_max_version_url(available_packages[package_name_new])
 			#endif
 
-			ver_cur = installed_packages[package_name]['version']
+			ver_cur = installed_packages[package_name_old]['version']
 			ver_avail = get_package_version(get_package_fn(url))
-			if ver_avail != ver_cur or force: 
-				print_('update %s-%s -> %s-%s' % (package_name, ver_cur, package_name, ver_avail))
+			if package_name_old != package_name_new or ver_avail != ver_cur or force:
+				print_('update %s-%s -> %s-%s' % (package_name_old, ver_cur, package_name_new, ver_avail))
 				packages_to_update.add(package)
 			#endif
 		#endfor
@@ -715,22 +728,29 @@ def main():
 		#endif
 
 		for package in packages_to_update:
-			package_name = get_package_name(package)
-			package_version = get_package_version(package)
-
-			if package_version:
-				url = get_specific_version_url(available_packages[package_name], package_version)
+			if '..' in package:
+				package_old, package_new = package.split('..')
+				package_name_old = get_package_name(package_old)
+				package_name_new = get_package_name(package_new)
+				package_version = get_package_version(package_new)
 			else:
-				url = get_max_version_url(available_packages[package_name])
+				package_name_old = package_name_new = get_package_name(package)
+				package_version = get_package_version(package)
 			#endif
 
-			ver_cur = installed_packages[package_name]['version']
+			if package_version:
+				url = get_specific_version_url(available_packages[package_name_new], package_version)
+			else:
+				url = get_max_version_url(available_packages[package_name_new])
+			#endif
+
+			ver_cur = installed_packages[package_name_old]['version']
 			ver_avail = get_package_version(get_package_fn(url))
-			if LooseVersion(ver_avail) != LooseVersion(ver_cur) \
-			or force: 
+			if package_name_old != package_name_new or ver_avail != ver_cur or force:
 				local_fn = download_package(url, cache_dir)
-				package_info = update_package(local_fn, installed_packages[package_name], prefix, force)
-				installed_packages[package_name] = package_info
+				package_info = update_package(local_fn, package_name_old, installed_packages[package_name_old], prefix, force)
+				del installed_packages[package_name_old]
+				installed_packages[package_name_new] = package_info
 				save_installed_packages(installed_packages, db_fn)
 			#endif
 		#endfor
