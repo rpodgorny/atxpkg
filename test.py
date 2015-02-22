@@ -26,6 +26,7 @@ class MyOtherTestCase(unittest.TestCase):
 	def test_install(self):
 		subprocess.check_call('./atxpkg install atxpkg --yes --prefix=/tmp/atxpkg_dest', shell=True)
 		subprocess.check_call('./atxpkg update atxpkg..router --yes --prefix=/tmp/atxpkg_dest', shell=True)
+		subprocess.check_call('./atxpkg remove router --yes --prefix=/tmp/atxpkg_dest', shell=True)
 	#enddef
 
 	def tearDowon(self):
