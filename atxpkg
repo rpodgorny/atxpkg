@@ -5,7 +5,7 @@ Asterix package manager.
 
 Usage:
   atxpkg install [--prefix=<path>] [--force] [options] <package>...
-  atxpkg update [--prefix=<path>] [--force] [options] [<package>...]
+  atxpkg update [--prefix=<path>] [--force] [options] [<package>...] [<old_package..new_package>...]
   atxpkg remove [--prefix=<path>] [options] <package>...
   atxpkg check [--prefix=<path>] [options] [<package>...]
   atxpkg merge_config [--prefix=<path>] [options] [<package>...]
