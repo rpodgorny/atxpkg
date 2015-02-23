@@ -1,8 +1,40 @@
 #!/usr/bin/python3
 
 import unittest
+import os
+import shutil
+import subprocess
+import tempfile
 
 from utils import *
+
+class MyOtherTestCase(unittest.TestCase):
+	def setUp(self):
+		#self.d = tempfile.mkdtemp()
+		self.d = '/tmp/atxpkg'
+		if os.path.isdir(self.d): shutil.rmtree(self.d)
+		os.mkdir('/tmp/atxpkg')
+
+		if os.path.isdir('/tmp/atxpkg_dest'): shutil.rmtree('/tmp/atxpkg_dest')
+
+		with open('%s/repos.txt' % self.d, 'w') as f:
+			f.write('http://atxpkg.asterix.cz\n')
+			f.write('http://atxpkg-dev.asterix.cz\n')
+		#endwith
+	#endef
+
+	def test_install(self):
+		subprocess.check_call('./atxpkg install atxpkg --yes --prefix=/tmp/atxpkg_dest', shell=True)
+		subprocess.check_call('./atxpkg update atxpkg..router --yes --prefix=/tmp/atxpkg_dest', shell=True)
+		subprocess.check_call('./atxpkg remove router --yes --prefix=/tmp/atxpkg_dest', shell=True)
+	#enddef
+
+	def tearDowon(self):
+		if os.path.isdir(self.d): shutil.rmtree(self.d)
+		if os.path.isdir('/tmp/atxpkg_dest'): shutil.rmtree('/tmp/atxpkg_dest')
+	#enddef
+#endclass
+
 
 class MyTestCase(unittest.TestCase):
 	def test_package_name(self):
