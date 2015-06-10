@@ -1,6 +1,6 @@
 set p=c:\atxpkg
 
-Echo.%PATH% | findstr /C:"%p%">nul && (
+Echo.%PATH% | findstr /I /C:"%p%">nul && (
   echo %p% already in path
 ) || (
   echo adding to %p% to path
