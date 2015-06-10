@@ -3,7 +3,7 @@ echo this is compile.bat v0.3
 setlocal
 
 set name=atxpkg
-set pkgrel=2
+set pkgrel=3
 
 rd /s /q build
 rd /s /q dist
