@@ -6,9 +6,11 @@ import shutil
 import subprocess
 import tempfile
 
+#from atxpkg import *
 from utils import *
 
-class MyOtherTestCase(unittest.TestCase):
+
+class HighLevelTestCase(unittest.TestCase):
 	def setUp(self):
 		# TODO: create temporary directory
 		#self.d = tempfile.mkdtemp()
@@ -24,15 +26,30 @@ class MyOtherTestCase(unittest.TestCase):
 		#endwith
 	#endef
 
+	def tearDown(self):
+		if os.path.isdir(self.d): shutil.rmtree(self.d)
+		if os.path.isdir('/tmp/atxpkg_dest'): shutil.rmtree('/tmp/atxpkg_dest')
+	#enddef
+
 	def test_install(self):
 		subprocess.check_call('./atxpkg install atxpkg --yes --prefix=/tmp/atxpkg_dest', shell=True)
 		subprocess.check_call('./atxpkg update atxpkg..router --yes --prefix=/tmp/atxpkg_dest', shell=True)
 		subprocess.check_call('./atxpkg remove router --yes --prefix=/tmp/atxpkg_dest', shell=True)
 	#enddef
+#endclass
 
-	def tearDowon(self):
-		if os.path.isdir(self.d): shutil.rmtree(self.d)
-		if os.path.isdir('/tmp/atxpkg_dest'): shutil.rmtree('/tmp/atxpkg_dest')
+
+class AtxPkgTestCase(unittest.TestCase):
+	def setUp(self):
+		pass
+	#enddef
+
+	def tearDown(self):
+		pass
+	#enddef
+
+	def test_test(self):
+		pass
 	#enddef
 #endclass
 
