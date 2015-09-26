@@ -10,6 +10,7 @@ from utils import *
 
 class MyOtherTestCase(unittest.TestCase):
 	def setUp(self):
+		# TODO: create temporary directory
 		#self.d = tempfile.mkdtemp()
 		self.d = '/tmp/atxpkg'
 		if os.path.isdir(self.d): shutil.rmtree(self.d)
