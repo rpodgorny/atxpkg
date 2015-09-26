@@ -1,2 +1,4 @@
 __pycache__
 *.atxpkg.zip
+htmlcov
+.coverage
