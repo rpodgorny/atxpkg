@@ -65,31 +65,6 @@ def print_(str):
 	logging.info(str)
 #enddef
 
-# TODO: possibly use 'atxpkg_inuse.exe'
-def try_delete(fn):
-	if not os.path.isfile(fn): return
-
-	del_fn = '%s.atxpkg_delete' % fn
-	while os.path.isfile(del_fn):
-		try:
-			os.remove(del_fn)
-			break
-		except:
-			pass
-		#endtry
-
-		del_fn += '_delete'
-	#endwhile
-
-	os.rename(fn, del_fn)
-
-	try:
-		os.remove(del_fn)
-	except:
-		pass
-	#endtry
-#enddef
-
 def get_repos(fn):
 	ret = []
 
@@ -103,7 +78,6 @@ def get_repos(fn):
 
 	return ret
 #enddef
-
 
 def get_available_packages(repos):
 	ret = {}
@@ -216,6 +190,7 @@ def install_package(fn, prefix, force=False):
 	cwd = os.getcwd()
 	try:
 		tmpdir = tempfile.mkdtemp()
+		logging.debug('tmpdir is %s' % tmpdir)
 
 		os.chdir(tmpdir)
 		unzip(fn)
@@ -511,7 +486,9 @@ def merge(fn1, fn2):
 #enddef
 
 def get_md5sum(fn):
-	return hashlib.md5(open(fn, 'rb').read()).hexdigest()
+	with open(fn, 'rb') as f:
+		return hashlib.md5(f.read()).hexdigest()
+	#endwith
 #enddef
 
 def get_recursive_listing(path):
@@ -729,38 +706,3 @@ def is_valid_package_fn(fn):
 def has_version(pkg_spec):
 	return re.match('[\w\-\.]+-[\d.]+-\d+', pkg_spec) is not None
 #enddef
-
-
-def mergeconfig_package(package_name, installed_packages, prefix):
-	package_info = installed_packages[package_name]
-
-	if 'backup' in package_info:
-		files_to_backup = package_info['backup']
-	else:
-		files_to_backup = []
-	#endif
-
-	for fn in files_to_backup:
-		for suffix in ['atxpkg_backup', 'atxpkg_new', 'atxpkg_save']:
-			fn_full = '%s/%s' % (prefix, fn)
-			fn_from_full = '%s.%s' % (fn_full, suffix)
-
-			if os.path.isfile(fn_from_full):
-				logging.debug('found %s, running merge' % fn_from_full)
-
-				if yes_no('found %s, merge?' % fn_from_full, 'y'):
-					merge(fn_full, fn_from_full)
-
-					# just prints the diff
-					#diff(fn_full, fn_from_full)
-
-					if yes_no('delete %s?' % fn_from_full):
-						logging.debug('D %s' % fn_from_full)
-						os.remove(fn_from_full)
-					#endif
-				#endif
-			#endif
-		#endfor
-	#endfor
-#enddef
-

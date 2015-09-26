@@ -16,7 +16,7 @@ class HighLevelTestCase(unittest.TestCase):
 		#self.d = tempfile.mkdtemp()
 		self.d = '/tmp/atxpkg'
 		if os.path.isdir(self.d): shutil.rmtree(self.d)
-		os.mkdir('/tmp/atxpkg')
+		os.mkdir(self.d)
 
 		if os.path.isdir('/tmp/atxpkg_dest'): shutil.rmtree('/tmp/atxpkg_dest')
 
@@ -39,17 +39,26 @@ class HighLevelTestCase(unittest.TestCase):
 #endclass
 
 
-class AtxPkgTestCase(unittest.TestCase):
+class TestCase(unittest.TestCase):
 	def setUp(self):
-		pass
+		self.d = '/tmp/atxpkg'
+		if os.path.isdir(self.d): shutil.rmtree(self.d)
+		os.mkdir(self.d)
 	#enddef
 
 	def tearDown(self):
-		pass
+		if os.path.isdir(self.d): shutil.rmtree(self.d)
+		if os.path.isdir('/tmp/atxpkg_dest'): shutil.rmtree('/tmp/atxpkg_dest')
 	#enddef
 
-	def test_test(self):
-		pass
+	# TODO: this is hardly finished
+	def test_install_update_remove(self):
+		fn = os.path.abspath('test-atxpkg-1.5-3.atxpkg.zip')
+		installed_package = install_package(fn, self.d)
+		installed_packages = {}
+		installed_packages[get_package_name(fn)] = installed_package
+		update_package(fn, get_package_name(fn), installed_package, self.d)
+		remove_package(get_package_name(fn), installed_packages, self.d)
 	#enddef
 #endclass
 
