@@ -37,7 +37,7 @@ class MyOtherTestCase(unittest.TestCase):
 #endclass
 
 
-class MyTestCase(unittest.TestCase):
+class UtilsCase(unittest.TestCase):
 	def test_package_name(self):
 		self.assertEqual(get_package_name('package-3.5.6-1.atxpkg.zip'), 'package')
 		self.assertEqual(get_package_name('package-3.5.6-1'), 'package')
