@@ -1,0 +1,7 @@
+#!/bin/sh
+
+rm -rf htmlcov
+
+coverage run ./test.py
+coverage html
+coverage report
