@@ -54,10 +54,10 @@ def main():
 	if sys.platform == 'win32':
 		logging.debug('detected win32')
 
-		db_fn = '/atxpkg/installed.json'
-		repos_fn = '/atxpkg/repos.txt'
-		prefix = ''
-		cache_dir = '/atxpkg/cache'
+		db_fn = 'c:/atxpkg/installed.json'
+		repos_fn = 'c:/atxpkg/repos.txt'
+		prefix = 'c:'
+		cache_dir = 'c:/atxpkg/cache'
 	else:
 		db_fn = '/tmp/atxpkg/installed.json'
 		repos_fn = '/tmp/atxpkg/repos.txt'
