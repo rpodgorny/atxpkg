@@ -34,7 +34,7 @@ rm .version
 set version=%version:~1%
 
 ;rem no, i can't do this inside of the if for some reason - FUCK WINDOWS!
-awk "BEGIN {print strftime(\"%%Y%%m%%d%%H%%M%%S\")}" >.datetime
+gawk "BEGIN {print strftime(\"%%Y%%m%%d%%H%%M%%S\")}" >.datetime
 set /p datetime=<.datetime
 rm .datetime
 
@@ -62,6 +62,6 @@ cd ..
 
 rd /s /q pkg
 
-pscp %pkg_fn% %upload%
+rsync -avP %pkg_fn% %upload%
 
 :end
