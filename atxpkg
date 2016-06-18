@@ -42,7 +42,6 @@ def main():
 		log_level = 'DEBUG'
 	else:
 		log_level = 'INFO'
-	#endif
 
 	# TODO: HACK - let's remove this when thing stabilize
 	log_level = 'DEBUG'
@@ -63,7 +62,6 @@ def main():
 		repos_fn = '/tmp/atxpkg/repos.txt'
 		prefix = ''
 		cache_dir = '/tmp/atxpkg/cache'
-	#endif
 
 	repos = get_repos(repos_fn)
 	repos.append(cache_dir)
@@ -72,19 +70,15 @@ def main():
 
 	if args['--prefix']:
 		prefix = args['--prefix']
-	#endif
 
 	if not os.path.isfile(db_fn):
 		print_('%s not found, creating empty one' % db_fn)
 		with open(db_fn, 'w') as f:
 			f.write('{}')
-		#endwith
-	#endif
 
 	if not os.path.isdir(cache_dir):
 		print_('%s not found, creating empty one' % cache_dir)
 		os.makedirs(cache_dir)
-	#endif
 
 	installed_packages = get_installed_packages(db_fn)
 
@@ -99,12 +93,9 @@ def main():
 
 			if not package_name in available_packages:
 				raise Exception('unable to find package %s' % package_name)
-			#endif
 
 			if package_name in installed_packages and not force:
 				raise Exception('package %s already installed' % package_name)
-			#endif
-		#endfor
 
 		for package in args['<package>']:
 			package_name = get_package_name(package)
@@ -114,16 +105,13 @@ def main():
 				url = get_specific_version_url(available_packages[package_name], package_version)
 			else:
 				url = get_max_version_url(available_packages[package_name])
-			#endif
 
 			ver = get_package_version(get_package_fn(url))
 
 			print_('install %s-%s' % (package_name, ver))
-		#endfor
 
 		if not (yes or yes_no('continue?', default='y')):
 			return
-		#endif
 
 		for package in args['<package>']:
 			package_name = get_package_name(package)
@@ -133,13 +121,11 @@ def main():
 				url = get_specific_version_url(available_packages[package_name], package_version)
 			else:
 				url = get_max_version_url(available_packages[package_name])
-			#endif
 
 			local_fn = download_package(url, cache_dir)
 			package_info = install_package(local_fn, prefix, force)
 			installed_packages[package_name] = package_info
 			save_installed_packages(installed_packages, db_fn)
-		#endfor
 	elif args['update']:
 		available_packages = get_available_packages(repos)
 
@@ -153,15 +139,11 @@ def main():
 					package_name_new = get_package_name(package_new)
 				else:
 					package_name_old = package_name_new = get_package_name(package)
-				#endif
 
 				if not package_name_old in installed_packages:
 					raise Exception('package %s not installed' % package_name_old)
-				#endif
-			#endfor
 		else:
 			packages = installed_packages.keys()
-		#endif
 
 		packages_to_update = set()
 
@@ -174,36 +156,29 @@ def main():
 			else:
 				package_name_old = package_name_new = get_package_name(package)
 				package_version = get_package_version(package)
-			#endif
 
 			if not package_name_new in available_packages:
 				print('%s not available in any repository' % package_name_new)
 				logging.warning('%s not available in any repository' % package_name_new)
 				continue
-			#endif
 
 			if package_version:
 				url = get_specific_version_url(available_packages[package_name_new], package_version)
 			else:
 				url = get_max_version_url(available_packages[package_name_new])
-			#endif
 
 			ver_cur = installed_packages[package_name_old]['version']
 			ver_avail = get_package_version(get_package_fn(url))
 			if package_name_old != package_name_new or ver_avail != ver_cur or force:
 				print_('update %s-%s -> %s-%s' % (package_name_old, ver_cur, package_name_new, ver_avail))
 				packages_to_update.add(package)
-			#endif
-		#endfor
 
 		if not packages_to_update:
 			print_('nothing to update')
 			return
-		#endif
 
 		if not (yes or yes_no('continue?', default='y')):
 			return
-		#endif
 
 		for package in packages_to_update:
 			if '..' in package:
@@ -214,13 +189,11 @@ def main():
 			else:
 				package_name_old = package_name_new = get_package_name(package)
 				package_version = get_package_version(package)
-			#endif
 
 			if package_version:
 				url = get_specific_version_url(available_packages[package_name_new], package_version)
 			else:
 				url = get_max_version_url(available_packages[package_name_new])
-			#endif
 
 			ver_cur = installed_packages[package_name_old]['version']
 			ver_avail = get_package_version(get_package_fn(url))
@@ -230,8 +203,6 @@ def main():
 				del installed_packages[package_name_old]
 				installed_packages[package_name_new] = package_info
 				save_installed_packages(installed_packages, db_fn)
-			#endif
-		#endfor
 	elif args['merge_config']:
 		if args['<package>']:
 			packages = args['<package>']
@@ -241,57 +212,44 @@ def main():
 
 				if not package_name in installed_packages:
 					raise Exception('package %s not installed' % package_name)
-				#endif
-			#endfor
 		else:
 			packages = installed_packages.keys()
-		#endif
 
 		for package in packages:
 			package_name = get_package_name(package)
 
 			if not package_name in installed_packages:
 				raise Exception('package %s not installed' % package_name)
-			#endif
-		#endfor
 
 		for package in packages:
 			mergeconfig_package(package, installed_packages, prefix)
-		#endfor
 	elif args['remove']:
 		for package_name in args['<package>']:
 			if not package_name in installed_packages:
 				raise Exception('package %s not installed' % package_name)
-			#endif
-		#endfor
 
 		for package_name in args['<package>']:
 			package_version = installed_packages[package_name]['version']
 
 			print_('remove %s-%s' % (package_name, package_version))
-		#endfor
 
 		if not (yes or yes_no('continue?', default='n')):
 			return
-		#endif
 
 		for package_name in args['<package>']:
 			remove_package(package_name, installed_packages, prefix)
 			del installed_packages[package_name]
 			save_installed_packages(installed_packages, db_fn)
-		#endfor
 	elif args['list_available']:
 		available_packages = get_available_packages(repos)
 
 		for package_name in sorted(available_packages.keys()):
 			print_(package_name)
-		#endfor
 	elif args['list_installed']:
 		for package_name, package_info in installed_packages.items():
 			package_version = package_info['version']
 
 			print_('%s-%s' % (package_name, package_version))
-		#endfor
 	elif args['show_untracked']:
 		recursive = args['--recursive']
 
@@ -303,8 +261,6 @@ def main():
 			paths = set()
 			for fn in fn_to_package_name.keys():
 				paths.add(os.path.dirname(fn))
-			#endfor
-		#endif
 
 		while paths:
 			for path in paths.copy():
@@ -314,23 +270,16 @@ def main():
 							paths.add('%s/%s' % (path, fn))
 						else:
 							continue
-						#endif
-					#endif
 
 					if '%s/%s' % (path, fn) in fn_to_package_name: continue
 
 					print('%s/%s' % (path, fn))
-				#endfor
 
 				paths.remove(path)
-			#endfor
-		#endwhile
 	elif args['clean_cache']:
 		clean_cache(cache_dir)
-	#endif
 
 	return 0
-#enddef
 
 
 if __name__ == '__main__':
@@ -339,5 +288,3 @@ if __name__ == '__main__':
 	except Exception as e:
 		print('ERROR: %s' % str(e))
 		raise
-	#endif
-#endif
