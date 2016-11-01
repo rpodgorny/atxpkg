@@ -427,7 +427,7 @@ def yes_no(s, default=None):
 
 
 def merge(fn1, fn2):
-	cmd = '/atxpkg/atxpkg_vim.exe -d %s %s' % (fn1, fn2)
+	cmd = 'vim -d %s %s' % (fn1, fn2)
 	return subprocess.call(cmd, shell=True) == 0
 
 
