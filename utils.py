@@ -53,6 +53,7 @@ def logging_setup(level, fn=None, print_=True):
 		fh.setFormatter(formatter)
 		logger.addHandler(fh)
 
+
 def print_(str):
 	print(str)
 	logging.info(str)
@@ -60,7 +61,6 @@ def print_(str):
 
 def get_repos(fn):
 	ret = []
-
 	for line in open(fn, 'r'):
 		line = line.strip()
 		if not line:
@@ -68,13 +68,11 @@ def get_repos(fn):
 		if line.startswith(('#', ';')):
 			continue
 		ret.append(line)
-
 	return ret
 
 
 def get_available_packages(repos):
 	ret = {}
-
 	for repo in repos:
 		package_urls = get_repo_listing(repo)
 		#logging.debug(str(package_urls))
@@ -94,7 +92,6 @@ def get_available_packages(repos):
 				ret[package_name].append(package_url)
 			else:
 				ret[package_name] = [package_url, ]
-
 	return ret
 
 
@@ -112,7 +109,6 @@ def get_repo_listing(repo):
 		except:
 			logging.error('failed to get listing from %s' % repo)
 			return []
-
 		files = parse_index_html(r.read().decode())
 		return ['%s/%s' % (repo, f) for f in files]
 	else:
@@ -125,13 +121,11 @@ def get_repo_listing(repo):
 def download_package(url, cache_dir):
 	if url.startswith('http://'):
 		fn = '%s/%s' % (cache_dir, get_package_fn(url))
-
 		if not os.path.isfile(fn):
 			print_('downloading %s to %s' % (url, fn))
 			urllib.request.urlretrieve(url, fn)
 		else:
 			print_('using cached %s' % fn)
-
 		return fn
 	else:
 		return url
@@ -415,7 +409,6 @@ def yes_no(s, default=None):
 
 	while 1:
 		ans = input(q).lower()
-
 		if ans == 'y':
 			return True
 		elif ans == 'n':
@@ -442,21 +435,15 @@ def get_md5sum(fn):
 
 
 def get_recursive_listing(path):
-	ret_d = []
-	ret_f = []
-
+	ret_d, ret_f = [], []
 	for root, dirs, files in os.walk(path):
 		root = root.replace('\\', '/')  # TODO: not very nice
-
 		for d in dirs:
 			ret_d.append('%s/%s' % (root, d))
 		for f in files:
 			ret_f.append('%s/%s' % (root, f))
-
-	# cut the tempdir prefix
-	ret_d = [i[len(path) + 1:] for i in ret_d]
-	ret_f = [i[len(path) + 1:] for i in ret_f]
-
+	ret_d = [i[len(path) + 1:] for i in ret_d]  # cut the tempdir prefix
+	ret_f = [i[len(path) + 1:] for i in ret_f]  # cut the tempdir prefix
 	return ret_d, ret_f
 
 
@@ -467,7 +454,8 @@ def get_installed_packages(db_fn):
 
 
 def save_installed_packages(l, db_fn):
-	json.dump(l, open(db_fn, 'w'), indent=4)
+	with open(db_fn, 'w') as f:
+		json.dump(l, f, indent=2)
 
 
 def get_specific_version_url(urls, version):
@@ -501,7 +489,6 @@ def gen_fn_to_package_name_mapping(installed_packages, prefix):
 
 def get_repos(fn):
 	ret = []
-
 	for line in open(fn, 'r'):
 		line = line.strip()
 		if not line:
@@ -509,7 +496,6 @@ def get_repos(fn):
 		if line.startswith(('#', ';')):
 			continue
 		ret.append(line)
-
 	return ret
 
 
@@ -520,14 +506,12 @@ def parse_index_html(html):
 
 def get_repo_listing(repo):
 	logging.debug('getting repo listing from %s' % repo)
-
 	if repo.startswith('http://'):
 		try:
 			r = urllib.request.urlopen(repo)
 		except:
 			logging.error('failed to get listing from %s' % repo)
 			return []
-
 		files = parse_index_html(r.read().decode())
 		return ['%s/%s' % (repo, f) for f in files]
 	else:
@@ -540,13 +524,11 @@ def get_repo_listing(repo):
 def download_package(url, cache_dir):
 	if url.startswith('http://'):
 		fn = '%s/%s' % (cache_dir, get_package_fn(url))
-
 		if not os.path.isfile(fn):
 			print_('downloading %s to %s' % (url, fn))
 			urllib.request.urlretrieve(url, fn)
 		else:
 			print_('using cached %s' % fn)
-
 		return fn
 	else:
 		return url
@@ -554,7 +536,6 @@ def download_package(url, cache_dir):
 
 def unzip(fn):
 	print_('unzipping %s' % fn)
-
 	#cmd = 'unzip -q %s' % (fn, )
 	cmd = '%s x %s' % (BIN_7ZIP, fn)
 	logging.debug(cmd)
@@ -563,7 +544,6 @@ def unzip(fn):
 
 def get_available_packages(repos):
 	ret = {}
-
 	for repo in repos:
 		package_urls = get_repo_listing(repo)
 		#logging.debug(str(package_urls))
@@ -583,7 +563,6 @@ def get_available_packages(repos):
 				ret[package_name].append(package_url)
 			else:
 				ret[package_name] = [package_url, ]
-
 	return ret
 
 
