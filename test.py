@@ -15,18 +15,22 @@ class HighLevelTestCase(unittest.TestCase):
 		# TODO: create temporary directory
 		#self.d = tempfile.mkdtemp()
 		self.d = '/tmp/atxpkg'
-		if os.path.isdir(self.d): shutil.rmtree(self.d)
+		if os.path.isdir(self.d):
+			shutil.rmtree(self.d)
 		os.mkdir(self.d)
 
-		if os.path.isdir('/tmp/atxpkg_dest'): shutil.rmtree('/tmp/atxpkg_dest')
+		if os.path.isdir('/tmp/atxpkg_dest'):
+			shutil.rmtree('/tmp/atxpkg_dest')
 
 		with open('%s/repos.txt' % self.d, 'w') as f:
 			f.write('http://atxpkg.asterix.cz\n')
 			f.write('http://atxpkg-dev.asterix.cz\n')
 
 	def tearDown(self):
-		if os.path.isdir(self.d): shutil.rmtree(self.d)
-		if os.path.isdir('/tmp/atxpkg_dest'): shutil.rmtree('/tmp/atxpkg_dest')
+		if os.path.isdir(self.d):
+			shutil.rmtree(self.d)
+		if os.path.isdir('/tmp/atxpkg_dest'):
+			shutil.rmtree('/tmp/atxpkg_dest')
 
 	def test_install(self):
 		subprocess.check_call('./atxpkg install atxpkg --yes --prefix=/tmp/atxpkg_dest', shell=True)
@@ -37,12 +41,15 @@ class HighLevelTestCase(unittest.TestCase):
 class TestCase(unittest.TestCase):
 	def setUp(self):
 		self.d = '/tmp/atxpkg'
-		if os.path.isdir(self.d): shutil.rmtree(self.d)
+		if os.path.isdir(self.d):
+			shutil.rmtree(self.d)
 		os.mkdir(self.d)
 
 	def tearDown(self):
-		if os.path.isdir(self.d): shutil.rmtree(self.d)
-		if os.path.isdir('/tmp/atxpkg_dest'): shutil.rmtree('/tmp/atxpkg_dest')
+		if os.path.isdir(self.d):
+			shutil.rmtree(self.d)
+		if os.path.isdir('/tmp/atxpkg_dest'):
+			shutil.rmtree('/tmp/atxpkg_dest')
 
 	# TODO: this is hardly finished
 	def test_install_update_remove(self):
