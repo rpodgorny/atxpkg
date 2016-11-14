@@ -36,13 +36,7 @@ from utils import *
 def main():
 	args = docopt.docopt(__doc__, version=__version__)
 
-	debug = args['--debug']
-
-	if debug:
-		log_level = 'DEBUG'
-	else:
-		log_level = 'INFO'
-
+	log_level = 'DEBUG' if args['--debug'] else 'INFO'
 	# TODO: HACK - let's remove this when thing stabilize
 	log_level = 'DEBUG'
 
@@ -68,8 +62,7 @@ def main():
 
 	#logging.debug(str(args))
 
-	if args['--prefix']:
-		prefix = args['--prefix']
+	prefix = args['--prefix']
 
 	if not os.path.isfile(db_fn):
 		print_('%s not found, creating empty one' % db_fn)
