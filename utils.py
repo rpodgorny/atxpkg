@@ -159,9 +159,10 @@ def install_package(fn, prefix, force=False):
 
 	print_('installing %s-%s' % (name, version_new))
 
-	ret = {}
-	ret['version'] = get_package_version(get_package_fn(fn))
-	ret['md5sums'] = {}
+	ret = {
+		'version': get_package_version(get_package_fn(fn)),
+		'md5sums': {},
+	}
 
 	cwd = os.getcwd()
 	try:
@@ -225,9 +226,10 @@ def update_package(fn, name_old, installed_package, prefix, force=False):
 
 	print_('updating %s-%s -> %s-%s' % (name_old, version_old, name, version_new))
 
-	ret = {}
-	ret['version'] = version_new
-	ret['md5sums'] = {}
+	ret = {
+		'version': version_new,
+		'md5sums': {},
+	}
 
 	cwd = os.getcwd()
 	try:
