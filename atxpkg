@@ -20,7 +20,7 @@ Options:
   -h,--help        This screen.
   --prefix=<path>  Path prefix.
   --recursive      Recurse to directories.
-  --yes            Automatically answer yes to some questions.
+  -y,--yes         Automatically answer yes to some questions.
 
 '''
 
