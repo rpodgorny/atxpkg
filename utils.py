@@ -76,18 +76,14 @@ def get_available_packages(repos):
 	for repo in repos:
 		package_urls = get_repo_listing(repo)
 		#logging.debug(str(package_urls))
-
 		for package_url in package_urls:
 			package_fn = get_package_fn(package_url)
-
 			if not is_valid_package_fn(package_fn):
 				logging.debug('%s not valid package filename' % package_fn)
 				continue
-
 			package_name = get_package_name(package_fn)
 			package_version = get_package_version(package_fn)
 			#print(package_name, package_version)
-
 			if package_name in ret:
 				ret[package_name].append(package_url)
 			else:
@@ -102,7 +98,6 @@ def parse_index_html(html):
 
 def get_repo_listing(repo):
 	logging.debug('getting repo listing from %s' % repo)
-
 	if repo.startswith('http://'):
 		try:
 			r = urllib.request.urlopen(repo)
@@ -135,7 +130,6 @@ def download_package(url, cache_dir):
 def try_delete(fn):
 	if not os.path.isfile(fn):
 		return
-
 	del_fn = '%s.atxpkg_delete' % fn
 	while os.path.isfile(del_fn):
 		try:
@@ -144,9 +138,7 @@ def try_delete(fn):
 		except:
 			pass
 		del_fn += '_delete'
-
 	os.rename(fn, del_fn)
-
 	try:
 		os.remove(del_fn)
 	except:
@@ -156,58 +148,45 @@ def try_delete(fn):
 def install_package(fn, prefix, force=False):
 	name = get_package_name(get_package_fn(fn))
 	version_new = get_package_version(get_package_fn(fn))
-
 	print_('installing %s-%s' % (name, version_new))
-
 	ret = {
 		'version': get_package_version(get_package_fn(fn)),
 		'md5sums': {},
 	}
-
 	cwd = os.getcwd()
 	try:
 		tmpdir = tempfile.mkdtemp()
 		logging.debug('tmpdir is %s' % tmpdir)
-
 		os.chdir(tmpdir)
 		unzip(fn)
-
 		files_to_backup = []
 		if os.path.isfile('.atxpkg_backup'):
 			files_to_backup = getlines('.atxpkg_backup')
-
 		ret['backup'] = files_to_backup
-
 		dirs, files = get_recursive_listing(tmpdir)
-
 		if not force:
 			for f in files:
 				f = '%s/%s' % (prefix, f)
 				if os.path.isfile(f):
 					raise Exception('%s already exists!' % f)
-
 		for d in dirs:
 			try:
 				os.makedirs('%s/%s' % (prefix, d))
 			except:
 				pass
-
 		for f in files:
 			if f.startswith('.atxpkg_'):
 				continue
-
 			if os.path.isfile('%s/%s' % (prefix, f)) and f in files_to_backup:
 				# TODO: only backup when sum differs
 				print_('saving untracked %s/%s as %s/%s.atxpkg_save' % (prefix, f, prefix, f))
 				logging.debug('S %s/%s %s/%s.atxpkg_save' % (prefix, f, prefix, f))
 				shutil.move('%s/%s' % (prefix, f), '%s/%s.atxpkg_save' % (prefix, f))
-
 			ret['md5sums'][f] = get_md5sum(f)
 			try:
 				os.makedirs(os.path.dirname('%s/%s' % (prefix, f)))
 			except:
 				pass
-
 			logging.debug('I %s/%s' % (prefix, f))
 			try_delete('%s/%s' % (prefix, f))
 			#shutil.move(f, '%s/%s' % (prefix, f))
@@ -215,7 +194,6 @@ def install_package(fn, prefix, force=False):
 	finally:
 		os.chdir(cwd)
 		shutil.rmtree(tmpdir)
-
 	return ret
 
 
@@ -223,61 +201,46 @@ def update_package(fn, name_old, installed_package, prefix, force=False):
 	name = get_package_name(get_package_fn(fn))
 	version_old = installed_package['version']
 	version_new = get_package_version(get_package_fn(fn))
-
 	print_('updating %s-%s -> %s-%s' % (name_old, version_old, name, version_new))
-
 	ret = {
 		'version': version_new,
 		'md5sums': {},
 	}
-
 	cwd = os.getcwd()
 	try:
 		tmpdir = tempfile.mkdtemp()
-
 		os.chdir(tmpdir)
 		unzip(fn)
-
 		files_to_backup = []
 		if os.path.isfile('.atxpkg_backup'):
 			files_to_backup = getlines('.atxpkg_backup')
-
 		ret['backup'] = files_to_backup
-
 		dirs, files = get_recursive_listing(tmpdir)
-
 		if not force:
 			for f in files:
 				if os.path.isfile('%s/%s' % (prefix, f)) and not f in installed_package['md5sums']:
 					raise Exception('%s/%s exists in filesystem but is not part of original package' % (prefix, f))
-
 		for f in files:
 			if f.startswith('.atxpkg_'):
 				continue
-
 			sum_new = get_md5sum(f)
-
 			ret['md5sums'][f] = sum_new
 			try:
 				os.makedirs(os.path.dirname('%s/%s' % (prefix, f)))
 			except:
 				pass
-
 			if os.path.isfile('%s/%s' % (prefix, f)):
 				skip = False
 				backup = False
-
 				if f in files_to_backup:
 					sum_current = get_md5sum('%s/%s' % (prefix, f))
 					sum_original = installed_package['md5sums'][f]
-
 					if sum_original == sum_new:
 						skip = True
 					elif sum_current == sum_new:
 						pass
 					else:
 						backup = True
-
 				if skip:
 					logging.debug('S %s/%s' % (prefix, f))
 				elif backup:
@@ -295,29 +258,20 @@ def update_package(fn, name_old, installed_package, prefix, force=False):
 				try_delete('%s/%s' % (prefix, f))
 				#shutil.move(f, '%s/%s' % (prefix, f))
 				shutil.copy(f, '%s/%s' % (prefix, f))
-
 		# remove files which are no longer in the new version
-
-		if 'backup' in installed_package:
-			files_to_backup_old = installed_package['backup']
-		else:
-			files_to_backup_old = []
-
+		files_to_backup_old = installed_package['backup'] if 'backup' in installed_package else []
 		for fn, md5sum in installed_package['md5sums'].items():
 			if fn in ret['md5sums']:
 				continue
-
 			if not os.path.isfile('%s/%s' % (prefix, fn)):
 				logging.warning('%s/%s does not exist!' % (prefix, fn))
 				continue
-
 			backup = False
 			if fn in files_to_backup_old:
 				sum_current = get_md5sum('%s/%s' % (prefix, fn))
 				sum_original = md5sum
 				if sum_current != sum_original:
 					backup = True
-
 			if backup:
 				print_('saving changed %s/%s as %s/%s.atxpkg_save' % (prefix, fn, prefix, fn))
 				logging.debug('S %s/%s %s/%s.atxpkg_save' % (prefix, fn, prefix, fn))
@@ -325,7 +279,6 @@ def update_package(fn, name_old, installed_package, prefix, force=False):
 			else:
 				logging.debug('D %s/%s' % (prefix, fn))
 				os.remove('%s/%s' % (prefix, fn))
-
 			try:
 				os.removedirs(os.path.dirname('%s/%s' % (prefix, fn)))
 			except:
@@ -333,33 +286,24 @@ def update_package(fn, name_old, installed_package, prefix, force=False):
 	finally:
 		os.chdir(cwd)
 		shutil.rmtree(tmpdir)
-
 	return ret
 
 
 def remove_package(package_name, installed_packages, prefix):
 	version = installed_packages[package_name]['version']
 	print_('removing package %s: %s' % (package_name, version))
-
 	package_info = installed_packages[package_name]
-
-	if 'backup' in package_info:
-		files_to_backup_old = package_info['backup']
-	else:
-		files_to_backup_old = []
-
+	files_to_backup_old = package_info['backup'] if 'backup' in package_info else []
 	for fn, md5sum in package_info['md5sums'].items():
 		if not os.path.isfile('%s/%s' % (prefix, fn)):
 			logging.warning('%s/%s does not exist!' % (prefix, fn))
 			continue
-
 		backup = False
 		if fn in files_to_backup_old:
 			current_sum = get_md5sum('%s/%s' % (prefix, fn))
 			original_sum = md5sum
 			if current_sum != original_sum:
 				backup = True
-
 		if backup:
 			print_('%s/%s changed, keeping old backup' % (prefix, fn))
 			logging.debug('M %s/%s %s/%s.atxpkg_backup' % (prefix, fn, prefix, fn))
@@ -367,7 +311,6 @@ def remove_package(package_name, installed_packages, prefix):
 		else:
 			logging.debug('D %s/%s' % (prefix, fn))
 			try_delete('%s/%s' % (prefix, fn))
-
 		try:
 			os.removedirs(os.path.dirname('%s/%s' % (prefix, fn)))
 		except:
@@ -376,26 +319,16 @@ def remove_package(package_name, installed_packages, prefix):
 
 def mergeconfig_package(package_name, installed_packages, prefix):
 	package_info = installed_packages[package_name]
-
-	if 'backup' in package_info:
-		files_to_backup = package_info['backup']
-	else:
-		files_to_backup = []
-
+	files_to_backup = package_info['backup'] if 'backup' in package_info else []
 	for fn in files_to_backup:
 		for suffix in ['atxpkg_backup', 'atxpkg_new', 'atxpkg_save']:
 			fn_full = '%s/%s' % (prefix, fn)
 			fn_from_full = '%s.%s' % (fn_full, suffix)
-
 			if os.path.isfile(fn_from_full):
 				logging.debug('found %s, running merge' % fn_from_full)
-
 				if yes_no('found %s, merge?' % fn_from_full, 'y'):
 					merge(fn_full, fn_from_full)
-
-					# just prints the diff
-					#diff(fn_full, fn_from_full)
-
+					#diff(fn_full, fn_from_full)  # just prints the diff
 					if yes_no('delete %s?' % fn_from_full):
 						logging.debug('D %s' % fn_from_full)
 						os.remove(fn_from_full)
@@ -408,7 +341,6 @@ def yes_no(s, default=None):
 		q = '%s [y/N] ' % s
 	else:
 		q = '%s [y/n] ' % s
-
 	while 1:
 		ans = input(q).lower()
 		if ans == 'y':
@@ -549,18 +481,14 @@ def get_available_packages(repos):
 	for repo in repos:
 		package_urls = get_repo_listing(repo)
 		#logging.debug(str(package_urls))
-
 		for package_url in package_urls:
 			package_fn = get_package_fn(package_url)
-
 			if not is_valid_package_fn(package_fn):
 				logging.debug('%s not valid package filename' % package_fn)
 				continue
-
 			package_name = get_package_name(package_fn)
 			package_version = get_package_version(package_fn)
 			#print(package_name, package_version)
-
 			if package_name in ret:
 				ret[package_name].append(package_url)
 			else:
@@ -583,7 +511,6 @@ def get_package_fn(url):
 # TODO: fn is not really fn here
 def get_package_name(fn):
 	fn = re.sub('\.atxpkg\..*', '', fn)
-
 	# TODO: this is actually not really nice
 	try:
 		name, ver, rel = fn.rsplit('-', 2)
@@ -595,7 +522,6 @@ def get_package_name(fn):
 # TODO: fn is not really fn here
 def get_package_version(fn):
 	fn = re.sub('\.atxpkg\..*', '', fn)
-
 	# TODO: this is actually not really nice
 	if has_version(fn):
 		name, ver, rel = fn.rsplit('-', 2)
