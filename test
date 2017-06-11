@@ -1,7 +1,24 @@
 #!/bin/sh
 
-rm -rf htmlcov
+if [ ! -d venv ]; then
+  python -m venv venv
+  export VIRTUAL_ENV=venv
+  export PATH="venv/bin:venv/Scripts:$PATH"
+  #pip install -e atxpylib
+  pip install pytest
+  pip install coverage
+  pip install -r requirements.txt
+fi
 
-coverage run ./test.py
-coverage html
-coverage report
+export VIRTUAL_ENV=venv
+export PATH="venv/bin:venv/Scripts:$PATH"
+
+#python -m unittest
+#coverage run -m unittest
+#coverage run -m pytest $@  # TODO: fix this
+coverage run -m pytest test*py
+
+COVERAGE_REPORT_ARGS="--omit=*/venv/*"
+rm -rf htmlcov
+coverage html ${COVERAGE_REPORT_ARGS}
+coverage report ${COVERAGE_REPORT_ARGS}

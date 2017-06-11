@@ -1,0 +1,5 @@
+# this is list of repositories. one entry per line, please.
+
+http://atxpkg.asterix.cz
+http://atxpkg-dev.asterix.cz
+#http://podgorny.cz/~radek/atxpkg
