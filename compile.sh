@@ -9,7 +9,7 @@ python -m venv venv
 export VIRTUAL_ENV=venv
 export PATH="venv/bin:venv/Scripts:$PATH"
 pip install cx_freeze
-pip install -e atxpylib
+#pip install -e atxpylib
 
 rm -rf build dist
 
@@ -24,8 +24,8 @@ rm -rf venv
 
 rm -rf pkg
 mkdir pkg
-mkdir -p pkg/atx300/$name
-cp -av dist/* pkg/atx300/$name/
+mkdir -p pkg/$name
+cp -av dist/* pkg/$name/
 
 if [ -d pkg_data ]; then
   cp -rv pkg_data/* pkg/
