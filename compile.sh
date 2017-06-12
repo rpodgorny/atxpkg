@@ -20,6 +20,9 @@ fi
 python setup.py install --prefix=dist
 rm -rf dist/PyQt5/Qt/bin/Qt5WebEngine*.* dist/PyQt5/Qt/qml
 
+# wtf?
+cp -v c:/windows/system32/vcruntime140.dll dist/
+
 rm -rf venv
 
 rm -rf pkg
