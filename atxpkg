@@ -4,11 +4,11 @@
 Asterix package manager.
 
 Usage:
-  atxpkg install [--prefix=<path>] [--force] [options] <package>...
-  atxpkg update [--prefix=<path>] [--force] [options] [<package>...] [<old_package..new_package>...]
-  atxpkg remove [--prefix=<path>] [options] <package>...
-  atxpkg check [--prefix=<path>] [options] [<package>...]
-  atxpkg merge_config [--prefix=<path>] [options] [<package>...]
+  atxpkg install [options] <package>...
+  atxpkg update [options] [<package>...] [<old_package..new_package>...]
+  atxpkg remove [options] <package>...
+  atxpkg check [options] [<package>...]
+  atxpkg merge_config [options] [<package>...]
   atxpkg list_available [options]
   atxpkg list_installed [options]
   atxpkg show_untracked [options] [--recursive] [<path>]
@@ -37,7 +37,7 @@ def main():
 	args = docopt.docopt(__doc__, version=__version__)
 	log_level = 'DEBUG' if args['--debug'] else 'INFO'
 	log_level = 'DEBUG'  # TODO: HACK - let's remove this when thing stabilize
-	logging_setup(log_level, print_=False)
+	logging_setup(log_level, print_=True)
 	logging.info('starting atxpkg v%s' % __version__)
 	if sys.platform == 'win32':
 		logging.debug('detected win32')
@@ -53,7 +53,7 @@ def main():
 	repos = get_repos(repos_fn)
 	repos.append(cache_dir)
 	#logging.debug(str(args))
-	prefix = args['--prefix']
+	prefix = args['--prefix'] if args['--prefix'] else ''
 	if not os.path.isfile(db_fn):
 		print_('%s not found, creating empty one' % db_fn)
 		with open(db_fn, 'w') as f:
