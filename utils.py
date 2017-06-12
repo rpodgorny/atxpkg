@@ -218,7 +218,7 @@ def update_package(fn, name_old, installed_package, prefix, force=False):
 		dirs, files = get_recursive_listing(tmpdir)
 		if not force:
 			for f in files:
-				if os.path.isfile('%s/%s' % (prefix, f)) and not f in installed_package['md5sums']:
+				if os.path.isfile('%s/%s' % (prefix, f)) and f not in installed_package['md5sums']:
 					raise Exception('%s/%s exists in filesystem but is not part of original package' % (prefix, f))
 		for f in files:
 			if f.startswith('.atxpkg_'):
@@ -421,79 +421,12 @@ def gen_fn_to_package_name_mapping(installed_packages, prefix):
 	return ret
 
 
-def get_repos(fn):
-	ret = []
-	for line in open(fn, 'r'):
-		line = line.strip()
-		if not line:
-			continue
-		if line.startswith(('#', ';')):
-			continue
-		ret.append(line)
-	return ret
-
-
-def parse_index_html(html):
-	ret = re.findall('[\w\-\._:/]+\.atxpkg\.\w+', html)
-	return ret
-
-
-def get_repo_listing(repo):
-	logging.debug('getting repo listing from %s' % repo)
-	if repo.startswith('http://'):
-		try:
-			r = urllib.request.urlopen(repo)
-		except:
-			logging.error('failed to get listing from %s' % repo)
-			return []
-		files = parse_index_html(r.read().decode())
-		return ['%s/%s' % (repo, f) for f in files]
-	else:
-		lst = glob.glob('%s/*' % repo)
-		lst = [i.replace('\\', '/') for i in lst]
-		lst = [i for i in lst if '.atxpkg.' in i]  # TODO: convert to more exact match
-		return lst
-
-
-def download_package(url, cache_dir):
-	if url.startswith('http://'):
-		fn = '%s/%s' % (cache_dir, get_package_fn(url))
-		if not os.path.isfile(fn):
-			print_('downloading %s to %s' % (url, fn))
-			urllib.request.urlretrieve(url, fn)
-		else:
-			print_('using cached %s' % fn)
-		return fn
-	else:
-		return url
-
-
 def unzip(fn):
 	print_('unzipping %s' % fn)
 	#cmd = 'unzip -q %s' % (fn, )
 	cmd = '%s x %s' % (BIN_7ZIP, fn)
 	logging.debug(cmd)
 	subprocess.check_call(cmd, shell=True, stdout=subprocess.DEVNULL)
-
-
-def get_available_packages(repos):
-	ret = {}
-	for repo in repos:
-		package_urls = get_repo_listing(repo)
-		#logging.debug(str(package_urls))
-		for package_url in package_urls:
-			package_fn = get_package_fn(package_url)
-			if not is_valid_package_fn(package_fn):
-				logging.debug('%s not valid package filename' % package_fn)
-				continue
-			package_name = get_package_name(package_fn)
-			package_version = get_package_version(package_fn)
-			#print(package_name, package_version)
-			if package_name in ret:
-				ret[package_name].append(package_url)
-			else:
-				ret[package_name] = [package_url, ]
-	return ret
 
 
 def get_max_version_url(urls):
