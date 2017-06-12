@@ -53,7 +53,7 @@ class TestCase(unittest.TestCase):
 
 	# TODO: this is hardly finished
 	def test_install_update_remove(self):
-		fn = os.path.abspath('test-atxpkg-1.5-3.atxpkg.zip')
+		fn = os.path.abspath('test_data/atxpkg-1.5-3.atxpkg.zip')
 		installed_package = install_package(fn, self.d)
 		installed_packages = {}
 		installed_packages[get_package_name(fn)] = installed_package

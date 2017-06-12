@@ -198,11 +198,11 @@ def install_package(fn, prefix, force=False):
 
 
 # TODO: find a better name
-def check_file_existence(fn, package_fns):
+def check_file_existence(prefix, fn, package_fns):
 	if sys.platform == 'win32':
 		fn = fn.lower()
 		package_fns = [i.lower() for i in package_fns]
-	return os.path.isfile(fn) and fn not in package_fns
+	return os.path.isfile('%s/%s' % (prefix, fn)) and fn not in package_fns
 
 
 def update_package(fn, name_old, installed_package, prefix, force=False):
@@ -226,7 +226,7 @@ def update_package(fn, name_old, installed_package, prefix, force=False):
 		dirs, files = get_recursive_listing(tmpdir)
 		if not force:
 			for f in files:
-				if check_file_existence('%s/%s' % (prefix, f), installed_package['md5sums']):
+				if check_file_existence(prefix, f, installed_package['md5sums'].keys()):
 					raise Exception('%s/%s exists in filesystem but is not part of original package' % (prefix, f))
 		for f in files:
 			if f.startswith('.atxpkg_'):
