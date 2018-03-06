@@ -37,7 +37,12 @@ def main():
 	args = docopt.docopt(__doc__, version=__version__)
 	log_level = 'DEBUG' if args['--debug'] else 'INFO'
 	log_level = 'DEBUG'  # TODO: HACK - let's remove this when things stabilize
-	logging_setup(log_level, print_=True)
+	if sys.platform == 'win32':
+		log_fn = 'c:/atxpkg/atxpkg.log'
+	else:
+		log_fn = '/tmp/atxpkg/atxpkg.log'
+	logging_setup(log_level, log_fn, print_=False)
+	logging.info('*' * 40)
 	logging.info('starting atxpkg v%s' % __version__)
 	if sys.platform == 'win32':
 		logging.debug('detected win32')
