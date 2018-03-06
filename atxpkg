@@ -44,6 +44,7 @@ def main():
 	logging_setup(log_level, log_fn, print_=False)
 	logging.info('*' * 40)
 	logging.info('starting atxpkg v%s' % __version__)
+	logging.debug('args: %s' % dict(args))
 	if sys.platform == 'win32':
 		logging.debug('detected win32')
 		db_fn = 'c:/atxpkg/installed.json'
@@ -51,6 +52,7 @@ def main():
 		prefix = 'c:'
 		cache_dir = 'c:/atxpkg/cache'
 	else:
+		logging.debug('detected non-win32')
 		db_fn = '/tmp/atxpkg/installed.json'
 		repos_fn = '/tmp/atxpkg/repos.txt'
 		prefix = ''
@@ -225,6 +227,7 @@ def main():
 				paths.remove(path)
 	elif args['clean_cache']:
 		clean_cache(cache_dir)
+	logging.debug('exit')
 	return 0
 
 
