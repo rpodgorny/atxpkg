@@ -60,11 +60,13 @@ def main():
 	#logging.debug(str(args))
 	prefix = args['--prefix'] if args['--prefix'] else ''
 	if not os.path.isfile(db_fn):
-		print_('%s not found, creating empty one' % db_fn)
+		print('%s not found, creating empty one' % db_fn)
+		logging.info('%s not found, creating empty one' % db_fn)
 		with open(db_fn, 'w') as f:
 			f.write('{}')
 	if not os.path.isdir(cache_dir):
-		print_('%s not found, creating empty one' % cache_dir)
+		print('%s not found, creating empty one' % cache_dir)
+		logging.info('%s not found, creating empty one' % cache_dir)
 		os.makedirs(cache_dir)
 	installed_packages = get_installed_packages(db_fn)
 	force = args['--force']
@@ -85,7 +87,7 @@ def main():
 			else:
 				url = get_max_version_url(available_packages[package_name])
 			ver = get_package_version(get_package_fn(url))
-			print_('install %s-%s' % (package_name, ver))
+			print('install %s-%s' % (package_name, ver))
 		if not (yes or yes_no('continue?', default='y')):
 			return
 		for package in args['<package>']:
@@ -136,10 +138,10 @@ def main():
 			ver_cur = installed_packages[package_name_old]['version']
 			ver_avail = get_package_version(get_package_fn(url))
 			if package_name_old != package_name_new or ver_avail != ver_cur or force:
-				print_('update %s-%s -> %s-%s' % (package_name_old, ver_cur, package_name_new, ver_avail))
+				print('update %s-%s -> %s-%s' % (package_name_old, ver_cur, package_name_new, ver_avail))
 				packages_to_update.add(package)
 		if not packages_to_update:
-			print_('nothing to update')
+			print('nothing to update')
 			return
 		if not (yes or yes_no('continue?', default='y')):
 			return
@@ -185,7 +187,7 @@ def main():
 				raise Exception('package %s not installed' % package_name)
 		for package_name in args['<package>']:
 			package_version = installed_packages[package_name]['version']
-			print_('remove %s-%s' % (package_name, package_version))
+			print('remove %s-%s' % (package_name, package_version))
 		if not (yes or yes_no('continue?', default='n')):
 			return
 		for package_name in args['<package>']:
@@ -195,11 +197,11 @@ def main():
 	elif args['list_available']:
 		available_packages = get_available_packages(repos)
 		for package_name in sorted(available_packages.keys()):
-			print_(package_name)
+			print(package_name)
 	elif args['list_installed']:
 		for package_name, package_info in installed_packages.items():
 			package_version = package_info['version']
-			print_('%s-%s' % (package_name, package_version))
+			print('%s-%s' % (package_name, package_version))
 	elif args['show_untracked']:
 		recursive = args['--recursive']
 		fn_to_package_name = gen_fn_to_package_name_mapping(installed_packages, prefix)

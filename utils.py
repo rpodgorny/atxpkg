@@ -54,11 +54,6 @@ def logging_setup(level, fn=None, print_=True):
 		logger.addHandler(fh)
 
 
-def print_(str):
-	print(str)
-	logging.info(str)
-
-
 def get_repos(fn):
 	ret = []
 	for line in open(fn, 'r'):
@@ -117,10 +112,12 @@ def download_package(url, cache_dir):
 	if url.startswith('http://'):
 		fn = '%s/%s' % (cache_dir, get_package_fn(url))
 		if not os.path.isfile(fn):
-			print_('downloading %s to %s' % (url, fn))
+			print('downloading %s to %s' % (url, fn))
+			logging.info('downloading %s to %s' % (url, fn))
 			urllib.request.urlretrieve(url, fn)
 		else:
-			print_('using cached %s' % fn)
+			print('using cached %s' % fn)
+			logging.info('using cached %s' % fn)
 		return fn
 	else:
 		return url
@@ -148,7 +145,8 @@ def try_delete(fn):
 def install_package(fn, prefix, force=False):
 	name = get_package_name(get_package_fn(fn))
 	version_new = get_package_version(get_package_fn(fn))
-	print_('installing %s-%s' % (name, version_new))
+	print('installing %s-%s' % (name, version_new))
+	logging.info('installing %s-%s' % (name, version_new))
 	ret = {
 		'version': get_package_version(get_package_fn(fn)),
 		'md5sums': {},
@@ -179,7 +177,8 @@ def install_package(fn, prefix, force=False):
 				continue
 			if os.path.isfile('%s/%s' % (prefix, f)) and f in files_to_backup:
 				# TODO: only backup when sum differs
-				print_('saving untracked %s/%s as %s/%s.atxpkg_save' % (prefix, f, prefix, f))
+				print('saving untracked %s/%s as %s/%s.atxpkg_save' % (prefix, f, prefix, f))
+				logging.info('saving untracked %s/%s as %s/%s.atxpkg_save' % (prefix, f, prefix, f))
 				logging.debug('S %s/%s %s/%s.atxpkg_save' % (prefix, f, prefix, f))
 				shutil.move('%s/%s' % (prefix, f), '%s/%s.atxpkg_save' % (prefix, f))
 			ret['md5sums'][f] = get_md5sum(f)
@@ -209,7 +208,8 @@ def update_package(fn, name_old, installed_package, prefix, force=False):
 	name = get_package_name(get_package_fn(fn))
 	version_old = installed_package['version']
 	version_new = get_package_version(get_package_fn(fn))
-	print_('updating %s-%s -> %s-%s' % (name_old, version_old, name, version_new))
+	print('updating %s-%s -> %s-%s' % (name_old, version_old, name, version_new))
+	logging.info('updating %s-%s -> %s-%s' % (name_old, version_old, name, version_new))
 	ret = {
 		'version': version_new,
 		'md5sums': {},
@@ -252,7 +252,8 @@ def update_package(fn, name_old, installed_package, prefix, force=False):
 				if skip:
 					logging.debug('S %s/%s' % (prefix, f))
 				elif backup:
-					print_('sum for file %s/%s changed, installing new version as %s/%s.atxpkg_new' % (prefix, f, prefix, f))
+					print('sum for file %s/%s changed, installing new version as %s/%s.atxpkg_new' % (prefix, f, prefix, f))
+					logging.info('sum for file %s/%s changed, installing new version as %s/%s.atxpkg_new' % (prefix, f, prefix, f))
 					logging.debug('I %s/%s.atxpkg_new' % (prefix, f))
 					#shutil.move(f, '%s/%s.atxpkg_new' % (prefix, f))
 					shutil.copy(f, '%s/%s.atxpkg_new' % (prefix, f))
@@ -281,7 +282,7 @@ def update_package(fn, name_old, installed_package, prefix, force=False):
 				if sum_current != sum_original:
 					backup = True
 			if backup:
-				print_('saving changed %s/%s as %s/%s.atxpkg_save' % (prefix, fn, prefix, fn))
+				print('saving changed %s/%s as %s/%s.atxpkg_save' % (prefix, fn, prefix, fn))
 				logging.debug('S %s/%s %s/%s.atxpkg_save' % (prefix, fn, prefix, fn))
 				shutil.move('%s/%s' % (prefix, fn), '%s/%s.atxpkg_save' % (prefix, fn))
 			else:
@@ -299,7 +300,8 @@ def update_package(fn, name_old, installed_package, prefix, force=False):
 
 def remove_package(package_name, installed_packages, prefix):
 	version = installed_packages[package_name]['version']
-	print_('removing package %s: %s' % (package_name, version))
+	print('removing package %s: %s' % (package_name, version))
+	logging.info('removing package %s: %s' % (package_name, version))
 	package_info = installed_packages[package_name]
 	files_to_backup_old = package_info['backup'] if 'backup' in package_info else []
 	for fn, md5sum in package_info['md5sums'].items():
@@ -313,7 +315,8 @@ def remove_package(package_name, installed_packages, prefix):
 			if current_sum != original_sum:
 				backup = True
 		if backup:
-			print_('%s/%s changed, keeping old backup' % (prefix, fn))
+			print('%s/%s changed, keeping old backup' % (prefix, fn))
+			logging.info('%s/%s changed, keeping old backup' % (prefix, fn))
 			logging.debug('M %s/%s %s/%s.atxpkg_backup' % (prefix, fn, prefix, fn))
 			os.rename('%s/%s' % (prefix, fn), '%s/%s.atxpkg_backup' % (prefix, fn))
 		else:
@@ -430,7 +433,8 @@ def gen_fn_to_package_name_mapping(installed_packages, prefix):
 
 
 def unzip(fn):
-	print_('unzipping %s' % fn)
+	print('unzipping %s' % fn)
+	logging.info('unzipping %s' % fn)
 	#cmd = 'unzip -q %s' % (fn, )
 	cmd = '%s x %s' % (BIN_7ZIP, fn)
 	logging.debug(cmd)
