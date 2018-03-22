@@ -20,7 +20,8 @@ Options:
   -h,--help        This screen.
   --prefix=<path>  Path prefix.
   --recursive      Recurse to directories.
-  -y,--yes         Automatically answer yes to some questions.
+  -y,--yes         Automatically answer yes to all questions.
+  -n,--no          Automatically answer no to all questions.
 
 '''
 
@@ -72,7 +73,7 @@ def main():
 		os.makedirs(cache_dir)
 	installed_packages = get_installed_packages(db_fn)
 	force = args['--force']
-	yes = args['--yes']
+	yes, no = args['--yes'], args['--no']
 	if args['install']:
 		available_packages = get_available_packages(repos)
 		for package in args['<package>']:
@@ -90,7 +91,7 @@ def main():
 				url = get_max_version_url(available_packages[package_name])
 			ver = get_package_version(get_package_fn(url))
 			print('install %s-%s' % (package_name, ver))
-		if not (yes or yes_no('continue?', default='y')):
+		if no or not (yes or yes_no('continue?', default='y')):
 			return
 		for package in args['<package>']:
 			package_name = get_package_name(package)
@@ -145,7 +146,7 @@ def main():
 		if not packages_to_update:
 			print('nothing to update')
 			return
-		if not (yes or yes_no('continue?', default='y')):
+		if no or not (yes or yes_no('continue?', default='y')):
 			return
 		for package in packages_to_update:
 			if '..' in package:
@@ -190,7 +191,7 @@ def main():
 		for package_name in args['<package>']:
 			package_version = installed_packages[package_name]['version']
 			print('remove %s-%s' % (package_name, package_version))
-		if not (yes or yes_no('continue?', default='n')):
+		if no or not (yes or yes_no('continue?', default='n')):
 			return
 		for package_name in args['<package>']:
 			remove_package(package_name, installed_packages, prefix)
