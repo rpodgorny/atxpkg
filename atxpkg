@@ -15,13 +15,14 @@ Usage:
   atxpkg clean_cache [options]
 
 Options:
-  --debug          Enable debug mode.
-  --force          Force operation (overwrite files etc.)
-  -h,--help        This screen.
-  --prefix=<path>  Path prefix.
-  --recursive      Recurse to directories.
-  -y,--yes         Automatically answer yes to all questions.
-  -n,--no          Automatically answer no to all questions.
+  --debug            Enable debug mode.
+  --force            Force operation (overwrite files etc.)
+  -w,--downloadonly  Only download packages, don't install/update anything.
+  -h,--help          This screen.
+  --prefix=<path>    Path prefix.
+  --recursive        Recurse to directories.
+  -y,--yes           Automatically answer yes to all questions.
+  -n,--no            Automatically answer no to all questions.
 
 '''
 
@@ -101,9 +102,10 @@ def main():
 			else:
 				url = get_max_version_url(available_packages[package_name])
 			local_fn = download_package(url, cache_dir)
-			package_info = install_package(local_fn, prefix, force)
-			installed_packages[package_name] = package_info
-			save_installed_packages(installed_packages, db_fn)
+			if not args['--downloadonly']:
+				package_info = install_package(local_fn, prefix, force)
+				installed_packages[package_name] = package_info
+				save_installed_packages(installed_packages, db_fn)
 	elif args['update']:
 		available_packages = get_available_packages(repos)
 		if args['<package>']:
@@ -165,10 +167,11 @@ def main():
 			ver_avail = get_package_version(get_package_fn(url))
 			if package_name_old != package_name_new or ver_avail != ver_cur or force:
 				local_fn = download_package(url, cache_dir)
-				package_info = update_package(local_fn, package_name_old, installed_packages[package_name_old], prefix, force)
-				del installed_packages[package_name_old]
-				installed_packages[package_name_new] = package_info
-				save_installed_packages(installed_packages, db_fn)
+				if not args['--downloadonly']:
+					package_info = update_package(local_fn, package_name_old, installed_packages[package_name_old], prefix, force)
+					del installed_packages[package_name_old]
+					installed_packages[package_name_new] = package_info
+					save_installed_packages(installed_packages, db_fn)
 	elif args['merge_config']:
 		if args['<package>']:
 			packages = args['<package>']
