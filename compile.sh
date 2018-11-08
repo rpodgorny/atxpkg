@@ -5,31 +5,22 @@ export name=atxpkg
 export pkgname=${name}
 export pkgrel=1
 
-rm -rf venv
-python -m venv venv
-export VIRTUAL_ENV=venv
-export PATH="venv/bin:venv/Scripts:$PATH"
-pip install cx_freeze
-#pip install -e atxpylib
+git submodule update --recursive --init
 
 rm -rf build dist
 
-if [ -f requirements.txt ]; then
-  pip install -r requirements.txt
-fi
+pipenv --rm || true
+pipenv install --dev
+pipenv run python setup.py install --prefix=dist
 
-python setup.py install --prefix=dist
-rm -rf dist/PyQt5/Qt/bin/Qt5WebEngine*.* dist/PyQt5/Qt/qml
-
-# wtf?
-cp -v c:/windows/system32/vcruntime140.dll dist/
-
-rm -rf venv
+rm -rf dist/PyQt5/Qt/bin/Qt5WebEngine*.* dist/PyQt5/Qt/bin dist/PyQt5/Qt/qml dist/PyQt5/Qt/resources dist/PyQt5/Qt/translations
+rm -rf dist/lib/PyQt5/Qt/bin/Qt5WebEngine*.* dist/lib/PyQt5/Qt/bin dist/lib/PyQt5/Qt/qml dist/lib/PyQt5/Qt/resources dist/lib/PyQt5/Qt/translations
+rm -rf dist/PySide2/*.exe dist/PySide2/Qt*WebEngine*.* dist/PySide2/Qt*Qml*.* dist/PySide2/Qt*3D*.* dist/PySide2/Qt*Quick*.* dist/PySide2/examples dist/PySide2/qml dist/PySide2/support dist/PySide2/translations
 
 rm -rf pkg
 mkdir pkg
-mkdir -p pkg/$name
-cp -av dist/* pkg/$name/
+mkdir -p pkg/atx300/${name}
+cp -av dist/* pkg/atx300/${name}/
 
 if [ -d pkg_data ]; then
   cp -rv pkg_data/* pkg/
@@ -44,7 +35,7 @@ rm -rf build dist
 if [ "$1" == "" ]; then
   export datetime=`gawk "BEGIN {print strftime(\"%Y%m%d%H%M%S\")}"`
   echo "devel version $datetime"
-  export name=${name}.dev
+  export pkgname=${pkgname}.dev
   export version=$datetime
   export upload=atxpkg@atxpkg-dev.asterix.cz:atxpkg/
 elif [ "$1" == "release" ]; then
@@ -57,7 +48,7 @@ else
   exit
 fi
 
-export pkg_fn=${name}-${version}-${pkgrel}.atxpkg.zip
+export pkg_fn=${pkgname}-${version}-${pkgrel}.atxpkg.zip
 
 rm -rf $pkg_fn
 
