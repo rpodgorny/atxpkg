@@ -2,6 +2,7 @@
 set -e -x
 
 export name=atxpkg
+export pkgname=${name}
 export pkgrel=1
 
 rm -rf venv
