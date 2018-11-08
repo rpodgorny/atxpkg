@@ -12,8 +12,6 @@ setup(
 		},
 	},
 	executables = [
-		Executable(
-			script='atxpkg',
-		),
+		Executable(script='atxpkg.py'),
 	]
 )

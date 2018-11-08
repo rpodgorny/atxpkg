@@ -33,9 +33,9 @@ class HighLevelTestCase(unittest.TestCase):
 			shutil.rmtree('/tmp/atxpkg_dest')
 
 	def test_install(self):
-		subprocess.check_call('./atxpkg install atxpkg --yes --prefix=/tmp/atxpkg_dest', shell=True)
-		subprocess.check_call('./atxpkg update atxpkg..router --yes --prefix=/tmp/atxpkg_dest', shell=True)
-		subprocess.check_call('./atxpkg remove router --yes --prefix=/tmp/atxpkg_dest', shell=True)
+		subprocess.check_call('./atxpkg.sh install atxpkg --yes --prefix=/tmp/atxpkg_dest', shell=True)
+		subprocess.check_call('./atxpkg.sh update atxpkg..router --yes --prefix=/tmp/atxpkg_dest', shell=True)
+		subprocess.check_call('./atxpkg.sh remove router --yes --prefix=/tmp/atxpkg_dest', shell=True)
 
 
 class TestCase(unittest.TestCase):
