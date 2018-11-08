@@ -43,7 +43,7 @@ def main():
 		log_fn = 'c:/atxpkg/atxpkg.log'
 	else:
 		log_fn = '/tmp/atxpkg/atxpkg.log'
-	logging_setup(log_level, log_fn, print_=False)
+	logging_setup(log_level, log_fn, print_=bool(args['--debug']))
 	logging.info('*' * 40)
 	logging.info('starting atxpkg v%s' % __version__)
 	logging.debug('args: %s' % dict(args))
