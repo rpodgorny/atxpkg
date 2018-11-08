@@ -38,12 +38,11 @@ from utils import *
 def main():
 	args = docopt.docopt(__doc__, version=__version__)
 	log_level = 'DEBUG' if args['--debug'] else 'INFO'
-	log_level = 'DEBUG'  # TODO: HACK - let's remove this when things stabilize
 	if sys.platform == 'win32':
 		log_fn = 'c:/atxpkg/atxpkg.log'
 	else:
 		log_fn = '/tmp/atxpkg/atxpkg.log'
-	logging_setup(log_level, log_fn, print_=bool(args['--debug']))
+	logging_setup(log_level, log_fn, print_=True)
 	logging.info('*' * 40)
 	logging.info('starting atxpkg v%s' % __version__)
 	logging.debug('args: %s' % dict(args))
@@ -64,12 +63,10 @@ def main():
 	#logging.debug(str(args))
 	prefix = args['--prefix'] if args['--prefix'] else ''
 	if not os.path.isfile(db_fn):
-		print('%s not found, creating empty one' % db_fn)
 		logging.info('%s not found, creating empty one' % db_fn)
 		with open(db_fn, 'w') as f:
 			f.write('{}')
 	if not os.path.isdir(cache_dir):
-		print('%s not found, creating empty one' % cache_dir)
 		logging.info('%s not found, creating empty one' % cache_dir)
 		os.makedirs(cache_dir)
 	installed_packages = get_installed_packages(db_fn)
@@ -133,7 +130,6 @@ def main():
 				package_name_old = package_name_new = get_package_name(package)
 				package_version = get_package_version(package)
 			if not package_name_new in available_packages:
-				print('%s not available in any repository' % package_name_new)
 				logging.warning('%s not available in any repository' % package_name_new)
 				continue
 			if package_version:

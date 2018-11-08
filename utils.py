@@ -112,11 +112,9 @@ def download_package(url, cache_dir):
 	if url.startswith('http://'):
 		fn = '%s/%s' % (cache_dir, get_package_fn(url))
 		if not os.path.isfile(fn):
-			print('downloading %s to %s' % (url, fn))
 			logging.info('downloading %s to %s' % (url, fn))
 			urllib.request.urlretrieve(url, fn)
 		else:
-			print('using cached %s' % fn)
 			logging.info('using cached %s' % fn)
 		return fn
 	else:
@@ -145,7 +143,6 @@ def try_delete(fn):
 def install_package(fn, prefix, force=False):
 	name = get_package_name(get_package_fn(fn))
 	version_new = get_package_version(get_package_fn(fn))
-	print('installing %s-%s' % (name, version_new))
 	logging.info('installing %s-%s' % (name, version_new))
 	ret = {
 		'version': get_package_version(get_package_fn(fn)),
@@ -177,7 +174,6 @@ def install_package(fn, prefix, force=False):
 				continue
 			if os.path.isfile('%s/%s' % (prefix, f)) and f in files_to_backup:
 				# TODO: only backup when sum differs
-				print('saving untracked %s/%s as %s/%s.atxpkg_save' % (prefix, f, prefix, f))
 				logging.info('saving untracked %s/%s as %s/%s.atxpkg_save' % (prefix, f, prefix, f))
 				logging.debug('S %s/%s %s/%s.atxpkg_save' % (prefix, f, prefix, f))
 				shutil.move('%s/%s' % (prefix, f), '%s/%s.atxpkg_save' % (prefix, f))
@@ -208,7 +204,6 @@ def update_package(fn, name_old, installed_package, prefix, force=False):
 	name = get_package_name(get_package_fn(fn))
 	version_old = installed_package['version']
 	version_new = get_package_version(get_package_fn(fn))
-	print('updating %s-%s -> %s-%s' % (name_old, version_old, name, version_new))
 	logging.info('updating %s-%s -> %s-%s' % (name_old, version_old, name, version_new))
 	ret = {
 		'version': version_new,
@@ -252,7 +247,6 @@ def update_package(fn, name_old, installed_package, prefix, force=False):
 				if skip:
 					logging.debug('S %s/%s' % (prefix, f))
 				elif backup:
-					print('sum for file %s/%s changed, installing new version as %s/%s.atxpkg_new' % (prefix, f, prefix, f))
 					logging.info('sum for file %s/%s changed, installing new version as %s/%s.atxpkg_new' % (prefix, f, prefix, f))
 					logging.debug('I %s/%s.atxpkg_new' % (prefix, f))
 					#shutil.move(f, '%s/%s.atxpkg_new' % (prefix, f))
@@ -282,11 +276,10 @@ def update_package(fn, name_old, installed_package, prefix, force=False):
 				if sum_current != sum_original:
 					backup = True
 			if backup:
-				print('saving changed %s/%s as %s/%s.atxpkg_save' % (prefix, fn, prefix, fn))
-				logging.debug('S %s/%s %s/%s.atxpkg_save' % (prefix, fn, prefix, fn))
+				logging.info('saving changed %s/%s as %s/%s.atxpkg_save' % (prefix, fn, prefix, fn))
 				shutil.move('%s/%s' % (prefix, fn), '%s/%s.atxpkg_save' % (prefix, fn))
 			else:
-				logging.debug('D %s/%s' % (prefix, fn))
+				logging.debug('removing %s/%s' % (prefix, fn))
 				os.remove('%s/%s' % (prefix, fn))
 			try:
 				os.removedirs(os.path.dirname('%s/%s' % (prefix, fn)))
@@ -300,7 +293,6 @@ def update_package(fn, name_old, installed_package, prefix, force=False):
 
 def remove_package(package_name, installed_packages, prefix):
 	version = installed_packages[package_name]['version']
-	print('removing package %s: %s' % (package_name, version))
 	logging.info('removing package %s: %s' % (package_name, version))
 	package_info = installed_packages[package_name]
 	files_to_backup_old = package_info['backup'] if 'backup' in package_info else []
@@ -315,12 +307,10 @@ def remove_package(package_name, installed_packages, prefix):
 			if current_sum != original_sum:
 				backup = True
 		if backup:
-			print('%s/%s changed, keeping old backup' % (prefix, fn))
-			logging.info('%s/%s changed, keeping old backup' % (prefix, fn))
-			logging.debug('M %s/%s %s/%s.atxpkg_backup' % (prefix, fn, prefix, fn))
+			logging.info('%s/%s changed, saving as %s/%s.atxpkg_backup' % (prefix, fn, prefix, fn))
 			os.rename('%s/%s' % (prefix, fn), '%s/%s.atxpkg_backup' % (prefix, fn))
 		else:
-			logging.debug('D %s/%s' % (prefix, fn))
+			logging.debug('removing %s/%s' % (prefix, fn))
 			try_delete('%s/%s' % (prefix, fn))
 		try:
 			os.removedirs(os.path.dirname('%s/%s' % (prefix, fn)))
@@ -433,7 +423,6 @@ def gen_fn_to_package_name_mapping(installed_packages, prefix):
 
 
 def unzip(fn):
-	print('unzipping %s' % fn)
 	logging.info('unzipping %s' % fn)
 	#cmd = 'unzip -q %s' % (fn, )
 	cmd = '%s x %s' % (BIN_7ZIP, fn)
