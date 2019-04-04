@@ -216,7 +216,7 @@ def main():
 		while paths:
 			for path in paths.copy():
 				for fn in os.listdir(path):
-					if os.path.isdir('%s/%s' % (path, fn)):
+					if os.path.isdir('%s/%s' % (path, fn)) and not os.path.islink('%s/%s' % (path, fn)):
 						if recursive:
 							paths.add('%s/%s' % (path, fn))
 						else:
