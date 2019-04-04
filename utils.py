@@ -92,7 +92,7 @@ def parse_index_html(html):
 
 
 def get_repo_listing(repo):
-	logging.debug('getting repo listing from %s' % repo)
+	logging.info('getting repo listing from %s' % repo)
 	if repo.startswith('http://'):
 		try:
 			r = urllib.request.urlopen(repo)
