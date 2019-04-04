@@ -8,17 +8,10 @@ setup(
 	version = __version__,
 	options = {
 		'build_exe': {
-			#'create_shared_zip': False,
-			#'compressed': True,
 			'include_msvcr': True,
 		},
 	},
 	executables = [
-		Executable(
-			script='atxpkg',
-			#appendScriptToExe=True,
-			#appendScriptToLibrary=False,
-			#compress=True,
-		),
+		Executable(script='atxpkg'),
 	]
 )
