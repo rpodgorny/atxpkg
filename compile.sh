@@ -19,8 +19,8 @@ rm -rf dist/PySide2/*.exe dist/PySide2/Qt*WebEngine*.* dist/PySide2/Qt*Qml*.* di
 
 rm -rf pkg
 mkdir pkg
-mkdir -p pkg/atx300/${name}
-cp -av dist/* pkg/atx300/${name}/
+mkdir -p pkg/${name}
+cp -av dist/* pkg/${name}/
 
 if [ -d pkg_data ]; then
   cp -rv pkg_data/* pkg/
