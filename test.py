@@ -99,7 +99,6 @@ class UtilsCase(unittest.TestCase):
 			'http://example.com/repo/package-1.2222-4.atxpkg.zip',
 			'http://example.com/repo/package-1.2222-44444.atxpkg.zip',
 		]
-
 		self.assertEqual(get_max_version_url(urls), 'http://example.com/repo/package-2.2-3.atxpkg.zip')
 
 
