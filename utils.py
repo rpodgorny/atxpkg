@@ -6,18 +6,15 @@ import os
 import shutil
 import json
 import hashlib
-import re
 import glob
 import tempfile
 import subprocess
 import urllib.request
+import re
 from distutils.version import LooseVersion
 
 
-if sys.platform == 'win32':
-	BIN_7ZIP = '/atxpkg/atxpkg_7za.exe'
-else:
-	BIN_7ZIP = '7za'
+BIN_7ZIP = '/atxpkg/atxpkg_7za.exe' if sys.platform == 'win32' else '7za'
 
 
 # TODO: this is cut-n-pasted from atxutils - decouple from atx
