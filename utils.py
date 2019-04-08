@@ -11,7 +11,7 @@ import tempfile
 import subprocess
 import urllib.request
 import re
-from distutils.version import LooseVersion
+import packaging.version
 
 
 BIN_7ZIP = '/atxpkg/atxpkg_7za.exe' if sys.platform == 'win32' else '7za'
@@ -430,7 +430,7 @@ def unzip(fn):
 def get_max_version_url(urls):
 	map_ = {get_package_version(get_package_fn(url)): url for url in urls}
 	# TODO: replacing '-' with '.' is a hack. looseversion is unable to handle it otherwise
-	max_version = sorted(map_.keys(), key=lambda x: LooseVersion(x.replace('-', '.')))[-1]
+	max_version = sorted(map_.keys(), key=lambda x: packaging.version.parse(x.replace('-', '.')))[-1]
 	return map_[max_version]
 
 

@@ -5,6 +5,7 @@ name = "pypi"
 
 [packages]
 docopt = "*"
+packaging = "*"
 
 [dev-packages]
 pytest = "*"
