@@ -229,6 +229,25 @@ def main():
 				paths.remove(path)
 	elif args['clean_cache']:
 		utils.clean_cache(cache_dir)
+	elif args['check']:
+		if args['<package>']:
+			packages = args['<package>']
+			for package in packages:
+				if not package in installed_packages.keys():
+					packages = []
+					print('%s not installed' % package)
+		else:
+			packages = installed_packages.keys()
+		if packages:
+			for package in packages:
+				for fn in installed_packages[package]['md5sums']:
+					if not os.path.isfile('%s/%s' % (prefix, fn)):
+						logging.info('%s/%s does not exist' % (prefix, fn))
+					else:
+						if utils.get_md5sum('%s/%s' % (prefix, fn)) != installed_packages[package]['md5sums'][fn]:
+							logging.info('sum of %s/%s differs' % (prefix, fn))
+				print('check of %s complete' % package)
+				logging.info('check of %s complete' % package)
 	logging.debug('exit')
 	return 0
 
