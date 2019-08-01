@@ -103,6 +103,7 @@ def main():
 				package_info = utils.install_package(local_fn, prefix, force)
 				installed_packages[package_name] = package_info
 				utils.save_installed_packages(installed_packages, db_fn)
+				logging.info('%s-%s is now installed' % (package_name, package_version))
 	elif args['update']:
 		available_packages = utils.get_available_packages(repos)
 		if args['<package>']:
@@ -168,6 +169,7 @@ def main():
 					del installed_packages[package_name_old]
 					installed_packages[package_name_new] = package_info
 					utils.save_installed_packages(installed_packages, db_fn)
+					logging.info('%s-%s updated to %s-%s' % (package_name_old, ver_cur, package_name_new, ver_avail))
 	elif args['merge_config']:
 		if args['<package>']:
 			packages = args['<package>']
