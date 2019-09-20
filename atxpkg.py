@@ -245,10 +245,11 @@ def main():
 					if not os.path.isfile('%s/%s' % (prefix, fn)):
 						print('%s/%s does not exist' % (prefix, fn))
 						err = 1
-					else:
-						if utils.get_md5sum('%s/%s' % (prefix, fn)) != installed_packages[package]['md5sums'][fn]:
-							print('sum of %s/%s differs' % (prefix, fn))
-							err = 1
+					elif fn in installed_packages[package]['backup']:
+						pass  # ignore config files
+					elif utils.get_md5sum('%s/%s' % (prefix, fn)) != installed_packages[package]['md5sums'][fn]:
+						print('sum of %s/%s differs' % (prefix, fn))
+						err = 1
 				print('check of %s complete' % package)
 			if err:
 				return 1
