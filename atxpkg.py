@@ -90,7 +90,7 @@ def main():
 			ver = utils.get_package_version(utils.get_package_fn(url))
 			print('install %s-%s' % (package_name, ver))
 		if no or not (yes or utils.yes_no('continue?', default='y')):
-			return
+			return 0
 		for package in args['<package>']:
 			package_name = utils.get_package_name(package)
 			package_version = utils.get_package_version(package)
@@ -144,9 +144,9 @@ def main():
 				packages_to_update.add(package)
 		if not packages_to_update:
 			print('nothing to update')
-			return
+			return 0
 		if no or not (yes or utils.yes_no('continue?', default='y')):
-			return
+			return 0
 		for package in packages_to_update:
 			if '..' in package:
 				package_old, package_new = package.split('..')
@@ -193,7 +193,7 @@ def main():
 			package_version = installed_packages[package_name]['version']
 			print('remove %s-%s' % (package_name, package_version))
 		if no or not (yes or utils.yes_no('continue?', default='n')):
-			return
+			return 0
 		for package_name in args['<package>']:
 			utils.remove_package(package_name, installed_packages, prefix)
 			del installed_packages[package_name]
@@ -239,15 +239,19 @@ def main():
 		else:
 			packages = installed_packages.keys()
 		if packages:
+			err = 0
 			for package in packages:
 				for fn in installed_packages[package]['md5sums']:
 					if not os.path.isfile('%s/%s' % (prefix, fn)):
-						logging.info('%s/%s does not exist' % (prefix, fn))
+						print('%s/%s does not exist' % (prefix, fn))
+						err = 1
 					else:
 						if utils.get_md5sum('%s/%s' % (prefix, fn)) != installed_packages[package]['md5sums'][fn]:
-							logging.info('sum of %s/%s differs' % (prefix, fn))
+							print('sum of %s/%s differs' % (prefix, fn))
+							err = 1
 				print('check of %s complete' % package)
-				logging.info('check of %s complete' % package)
+			if err:
+				return 1
 	logging.debug('exit')
 	return 0
 
