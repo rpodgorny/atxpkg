@@ -277,7 +277,7 @@ def update_package(fn, name_old, installed_package, prefix, force=False):
 				shutil.move('%s/%s' % (prefix, fn), '%s/%s.atxpkg_save' % (prefix, fn))
 			else:
 				logging.debug('removing %s/%s' % (prefix, fn))
-				os.remove('%s/%s' % (prefix, fn))
+				try_delete('%s/%s' % (prefix, fn))
 			try:
 				os.removedirs(os.path.dirname('%s/%s' % (prefix, fn)))
 			except:
