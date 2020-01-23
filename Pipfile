@@ -10,7 +10,6 @@ packaging = "*"
 [dev-packages]
 pytest = "*"
 coverage = "*"
-cx-freeze = {version = "*", sys_platform = "== 'win32'"}
 
 [requires]
 #python_version = "3.7"

@@ -8,11 +8,12 @@ echo 'cd c:/build
 rm Pipfile.lock
 pipenv --rm
 pipenv install --dev
+pipenv install cx-freeze
 pipenv run python setup.py install --prefix=dist
 ' | vagrant ssh --no-tty
 vagrant ssh -c "cd c:/build; cp -rv dist c:/vagrant/" --no-tty
 # TODO: hack jako svine
-cp -av /lib/python3.7/site-packages/dateutil dist/
+cp -av /lib/python3.8/site-packages/dateutil dist/
 vagrant halt
-vagrant destroy --force
-rm Vagrantfile
+#vagrant destroy --force
+#rm Vagrantfile
