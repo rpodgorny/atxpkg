@@ -9,9 +9,10 @@ git submodule update --recursive --init
 
 rm -rf build dist
 
-pipenv --rm || true
-pipenv install --dev
-pipenv run python setup.py install --prefix=dist
+#pipenv --rm || true
+#pipenv install --dev
+#pipenv run python setup.py install --prefix=dist
+./vagcompile.sh
 
 rm -rf dist/PyQt5/Qt/bin/Qt5WebEngine*.* dist/PyQt5/Qt/bin dist/PyQt5/Qt/qml dist/PyQt5/Qt/resources dist/PyQt5/Qt/translations
 rm -rf dist/lib/PyQt5/Qt/bin/Qt5WebEngine*.* dist/lib/PyQt5/Qt/bin dist/lib/PyQt5/Qt/qml dist/lib/PyQt5/Qt/resources dist/lib/PyQt5/Qt/translations
