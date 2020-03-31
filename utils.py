@@ -279,7 +279,10 @@ def update_package(fn, name_old, installed_package, prefix, force=False):
 				logging.debug('removing %s/%s' % (prefix, fn))
 				try_delete('%s/%s' % (prefix, fn))
 			try:
-				os.removedirs(os.path.dirname('%s/%s' % (prefix, fn)))
+				dn = os.path.dirname(fn)
+				if dn not in dirs:
+					fdn = os.path.dirname('%s/%s' % (prefix, fn))
+					os.removedirs(fdn)
 			except:
 				pass
 	finally:
