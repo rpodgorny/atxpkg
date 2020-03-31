@@ -15,5 +15,5 @@ vagrant ssh -c "cd c:/build; cp -rv dist c:/vagrant/" --no-tty
 # TODO: hack jako svine
 cp -av /lib/python3.8/site-packages/dateutil dist/
 vagrant halt
-#vagrant destroy --force
-#rm Vagrantfile
+vagrant destroy --force
+rm Vagrantfile
