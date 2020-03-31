@@ -60,6 +60,28 @@ class TestCase(unittest.TestCase):
 		update_package(fn, get_package_name(fn), installed_package, self.d)
 		remove_package(get_package_name(fn), installed_packages, self.d)
 
+	def test_install_empty_dirs(self):
+		fn = os.path.abspath('test_data/atx300-base.dev-0-1.atxpkg.zip')
+		installed_package = install_package(fn, self.d)
+		installed_packages = {}
+		installed_packages[get_package_name(fn)] = installed_package
+		self.assertTrue(os.path.isdir('/tmp/atxpkg/atx300'))
+		self.assertTrue(os.path.isdir('/tmp/atxpkg/atx300/comm/dis_man'))
+		self.assertTrue(os.path.isdir('/tmp/atxpkg/atx300/comm/dis_man/archive'))
+		self.assertTrue(os.listdir('/tmp/atxpkg/atx300/comm/dis_man/archive') == [])
+
+	def test_install_update_empty_dirs(self):
+		fn = os.path.abspath('test_data/atx300-base-6.3-1.atxpkg.zip')
+		fn2 = os.path.abspath('test_data/atx300-base.dev-0-1.atxpkg.zip')
+		installed_package = install_package(fn, self.d)
+		installed_packages = {}
+		installed_packages[get_package_name(fn)] = installed_package
+		update_package(fn2, get_package_name(fn), installed_package, self.d)
+		self.assertTrue(os.path.isdir('/tmp/atxpkg/atx300'))
+		self.assertTrue(os.path.isdir('/tmp/atxpkg/atx300/comm/dis_man'))
+		self.assertTrue(os.path.isdir('/tmp/atxpkg/atx300/comm/dis_man/archive'))
+		self.assertTrue(os.listdir('/tmp/atxpkg/atx300/comm/dis_man/archive') == [])
+
 
 class UtilsCase(unittest.TestCase):
 	def test_package_name(self):
