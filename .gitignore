@@ -1,5 +1,4 @@
 __pycache__
-*.atxpkg.zip
+/*.atxpkg.zip
 htmlcov
 .coverage
-venv
