@@ -33,6 +33,7 @@ import docopt
 import logging
 import os
 import utils
+import time
 
 
 def main():
@@ -101,6 +102,7 @@ def main():
 			local_fn = utils.download_package(url, cache_dir)
 			if not args['--downloadonly']:
 				package_info = utils.install_package(local_fn, prefix, force)
+				package_info["t"] = time.time()
 				installed_packages[package_name] = package_info
 				utils.save_installed_packages(installed_packages, db_fn)
 				ver = utils.get_package_version(utils.get_package_fn(url))
@@ -167,6 +169,7 @@ def main():
 				local_fn = utils.download_package(url, cache_dir)
 				if not args['--downloadonly']:
 					package_info = utils.update_package(local_fn, package_name_old, installed_packages[package_name_old], prefix, force)
+					package_info["t"] = time.time()
 					del installed_packages[package_name_old]
 					installed_packages[package_name_new] = package_info
 					utils.save_installed_packages(installed_packages, db_fn)
