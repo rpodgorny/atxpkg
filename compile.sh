@@ -60,3 +60,5 @@ cd ..
 rm -rf pkg
 
 rsync -avP $pkg_fn $upload
+
+echo "DONE: ${pkg_fn}"
