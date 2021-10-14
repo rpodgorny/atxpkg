@@ -90,7 +90,7 @@ def parse_index_html(html):
 
 def get_repo_listing(repo):
 	logging.info('getting repo listing from %s' % repo)
-	if repo.startswith('http://'):
+	if repo.startswith(('http://', 'https://')):
 		try:
 			r = urllib.request.urlopen(repo)
 		except:
@@ -106,7 +106,7 @@ def get_repo_listing(repo):
 
 
 def download_package(url, cache_dir):
-	if url.startswith('http://'):
+	if url.startswith(('http://', 'https://')):
 		fn = '%s/%s' % (cache_dir, get_package_fn(url))
 		if not os.path.isfile(fn):
 			logging.info('downloading %s to %s' % (url, fn))
