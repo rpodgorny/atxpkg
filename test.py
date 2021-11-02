@@ -24,7 +24,7 @@ class HighLevelTestCase(unittest.TestCase):
 
 		with open('%s/repos.txt' % self.d, 'w') as f:
 			f.write('http://atxpkg.asterix.cz\n')
-			f.write('http://atxpkg-dev.asterix.cz\n')
+			f.write('https://atxpkg-dev.asterix.cz\n')
 
 	def tearDown(self):
 		if os.path.isdir(self.d):
