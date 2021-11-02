@@ -9,19 +9,15 @@ git submodule update --recursive --init
 
 rm -rf build dist
 
-#pipenv --rm || true
-#pipenv install --dev
-#pipenv run python setup.py install --prefix=dist
-./vagcompile.sh
-
-rm -rf dist/PyQt5/Qt/bin/Qt5WebEngine*.* dist/PyQt5/Qt/bin dist/PyQt5/Qt/qml dist/PyQt5/Qt/resources dist/PyQt5/Qt/translations
-rm -rf dist/lib/PyQt5/Qt/bin/Qt5WebEngine*.* dist/lib/PyQt5/Qt/bin dist/lib/PyQt5/Qt/qml dist/lib/PyQt5/Qt/resources dist/lib/PyQt5/Qt/translations
-rm -rf dist/PySide2/*.exe dist/PySide2/Qt*WebEngine*.* dist/PySide2/Qt*Qml*.* dist/PySide2/Qt*3D*.* dist/PySide2/Qt*Quick*.* dist/PySide2/examples dist/PySide2/qml dist/PySide2/support dist/PySide2/translations
+#./compile_vagrant.sh
+./compile_docker.sh
 
 rm -rf pkg
 mkdir pkg
 mkdir -p pkg/${name}
 cp -av dist/* pkg/${name}/
+
+rm -rf build dist
 
 if [ -d pkg_data ]; then
   cp -rv pkg_data/* pkg/
@@ -31,23 +27,24 @@ if [ -f atxpkg_backup ]; then
   cp -av atxpkg_backup pkg/.atxpkg_backup
 fi
 
-rm -rf build dist
-
 if [ "$1" == "" ]; then
   export datetime=`gawk "BEGIN {print strftime(\"%Y%m%d%H%M%S\")}"`
   echo "devel version $datetime"
   export pkgname=${pkgname}.dev
   export version=$datetime
-  export upload=atxpkg@atxpkg-dev.asterix.cz:atxpkg/
+  export upload=scp://atxpkg@atxpkg-dev.asterix.cz:2224/atxpkg/
 elif [ "$1" == "release" ]; then
   export version=`git describe --tags --abbrev=0`
   export version=${version:1}
   echo "release version $version"
-  export upload=atxpkg@atxpkg.asterix.cz:atxpkg/
+  export upload=scp://atxpkg@atxpkg.asterix.cz:2224:/atxpkg/
 else
   echo "unknown parameter!"
   exit
 fi
+
+#export sshopts='-i ./id_rsa_atxpkg -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+export sshopts='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
 
 export pkg_fn=${pkgname}-${version}-${pkgrel}.atxpkg.zip
 
@@ -59,6 +56,6 @@ cd ..
 
 rm -rf pkg
 
-rsync -avP $pkg_fn $upload
+scp -B ${sshopts} $pkg_fn $upload
 
 echo "DONE: ${pkg_fn}"

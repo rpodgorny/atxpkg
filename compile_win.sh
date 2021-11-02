@@ -1,12 +1,13 @@
 #!/bin/sh
 set -e -x
 
+PYPI_CACHE="172.17.0.1"
+PYTHON_SITE_PACKAGES="/wine/drive_c/Python39/Lib/site-packages"
+
 rm -rf build dist
 
-#pip install --no-cache-dir -i http://10.0.2.2:3141/root/pypi/+simple/ --trusted-host 10.0.2.2 --upgrade pip  # otherwise editable install mode for atxpylib does not work
-pip install --no-cache-dir -i http://10.0.2.2:3141/root/pypi/+simple/ --trusted-host 10.0.2.2 -r requirements.txt
-#pip install --no-cache-dir -i http://10.0.2.2:3141/root/pypi/+simple/ --trusted-host 10.0.2.2 "pyinstaller<4" "setuptools<45"
-pip install --no-cache-dir -i http://10.0.2.2:3141/root/pypi/+simple/ --trusted-host 10.0.2.2 cx-freeze
+pip install --no-cache-dir -i http://${PYPI_CACHE}:3141/root/pypi/+simple/ --trusted-host ${PYPI_CACHE} -r requirements.txt
+pip install --no-cache-dir -i http://${PYPI_CACHE}:3141/root/pypi/+simple/ --trusted-host ${PYPI_CACHE} cx-freeze
 #python atxmanager/version.py >__v.txt
 #pyinstaller --noconfirm --clean --noupx --windowed -n 4to6serverw 4to6server.py
 #pyinstaller --noconfirm --clean --noupx 4to6server.py
@@ -19,9 +20,6 @@ python setup.py install --prefix=dist
 
 #./merge_dist.sh
 
-#rm -rf dist/PyQt5/Qt/qml
-#rm -rf dist/PyQt5/Qt/bin/Qt5WebEngine*.* dist/PyQt5/Qt/bin dist/PyQt5/Qt/qml dist/PyQt5/Qt/resources dist/PyQt5/Qt/translations
-#rm -rf dist/lib/PyQt5/Qt/bin/Qt5WebEngine*.* dist/lib/PyQt5/Qt/bin dist/lib/PyQt5/Qt/qml dist/lib/PyQt5/Qt/resources dist/lib/PyQt5/Qt/translations
-#rm -rf dist/PySide2/*.exe dist/PySide2/Qt*WebEngine*.* dist/PySide2/Qt*Qml*.* dist/PySide2/Qt*3D*.* dist/PySide2/Qt*Quick*.* dist/PySide2/examples dist/PySide2/qml dist/PySide2/support dist/PySide2/translations
-
 #cp -av c:/python37/lib/site-packages/dateutil dist/  # fix for pyinstaller/arrow/dateutil/whatever... bug
+
+chmod -R a+rwX .  # this is being run under root in docker - so make it possible to delete this dir from outside by regular user
