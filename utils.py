@@ -94,7 +94,7 @@ def get_repo_listing(repo):
 		try:
 			r = urllib.request.urlopen(repo)
 		except:
-			logging.error('failed to get listing from %s' % repo)
+			logging.exception('failed to get listing from %s' % repo)
 			return []
 		files = parse_index_html(r.read().decode())
 		return ['%s/%s' % (repo, f) for f in files]
