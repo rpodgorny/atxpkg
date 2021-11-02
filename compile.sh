@@ -37,7 +37,7 @@ elif [ "$1" == "release" ]; then
   export version=`git describe --tags --abbrev=0`
   export version=${version:1}
   echo "release version $version"
-  export upload=scp://atxpkg@atxpkg.asterix.cz:2224:/atxpkg/
+  export upload=scp://atxpkg@atxpkg.asterix.cz:2225/atxpkg/
 else
   echo "unknown parameter!"
   exit
