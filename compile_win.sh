@@ -22,4 +22,6 @@ python setup.py install --prefix=dist
 
 #cp -av c:/python37/lib/site-packages/dateutil dist/  # fix for pyinstaller/arrow/dateutil/whatever... bug
 
+cp -av api-ms-win-core-path-l1-1-0.dll dist/  # fix for python3.9 not being supported on windows7
+
 chmod -R a+rwX .  # this is being run under root in docker - so make it possible to delete this dir from outside by regular user
