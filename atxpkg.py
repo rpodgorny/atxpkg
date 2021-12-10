@@ -116,29 +116,33 @@ def main():
 				if '..' in package:
 					package_old, package_new = package.split('..')
 					package_name_old = utils.get_package_name(package_old)
+					package_version_old = utils.get_package_version(package_old)
 					package_name_new = utils.get_package_name(package_new)
+					package_version_new = utils.get_package_version(package_new)
 				else:
-					package_name_old = package_name_new = utils.get_package_name(package)
-
-				if package_name_old not in installed_packages:
-					raise Exception('package %s not installed' % package_name_old)
+					package_name_new = utils.get_package_name(package)
+					package_version_new = utils.get_package_version(package)
+					package_name_old = package_name_new
+					package_version_old = None
+				if package_name_old not in installed_packages \
+				or (package_version_old and package_version_old != installed_packages[package_name_old]["version"]):
+					raise Exception('package %s not installed' % package_old)
 		else:
 			packages = installed_packages.keys()
 		packages_to_update = set()
 		for package in packages:
 			if '..' in package:
 				package_old, package_new = package.split('..')
-				package_name_old = utils.get_package_name(package_old)
-				package_name_new = utils.get_package_name(package_new)
-				package_version = utils.get_package_version(package_new)
 			else:
-				package_name_old = package_name_new = utils.get_package_name(package)
-				package_version = utils.get_package_version(package)
+				package_old = package_new = package
+			package_name_old = utils.get_package_name(package_old)
+			package_name_new = utils.get_package_name(package_new)
+			package_version_new = utils.get_package_version(package_new)
 			if package_name_new not in available_packages:
 				logging.warning('%s not available in any repository' % package_name_new)
 				continue
-			if package_version:
-				url = utils.get_specific_version_url(available_packages[package_name_new], package_version)
+			if package_version_new:
+				url = utils.get_specific_version_url(available_packages[package_name_new], package_version_new)
 			else:
 				url = utils.get_max_version_url(available_packages[package_name_new])
 			ver_cur = installed_packages[package_name_old]['version']
@@ -154,14 +158,13 @@ def main():
 		for package in packages_to_update:
 			if '..' in package:
 				package_old, package_new = package.split('..')
-				package_name_old = utils.get_package_name(package_old)
-				package_name_new = utils.get_package_name(package_new)
-				package_version = utils.get_package_version(package_new)
 			else:
-				package_name_old = package_name_new = utils.get_package_name(package)
-				package_version = utils.get_package_version(package)
-			if package_version:
-				url = utils.get_specific_version_url(available_packages[package_name_new], package_version)
+				package_old = package_new = package
+			package_name_old = utils.get_package_name(package_old)
+			package_name_new = utils.get_package_name(package_new)
+			package_version_new = utils.get_package_version(package_new)
+			if package_version_new:
+				url = utils.get_specific_version_url(available_packages[package_name_new], package_version_new)
 			else:
 				url = utils.get_max_version_url(available_packages[package_name_new])
 			ver_cur = installed_packages[package_name_old]['version']
@@ -191,15 +194,22 @@ def main():
 		for package in packages:
 			utils.mergeconfig_package(package, installed_packages, prefix)
 	elif args['remove']:
-		for package_name in args['<package>']:
-			if package_name not in installed_packages:
-				raise Exception('package %s not installed' % package_name)
-		for package_name in args['<package>']:
-			package_version = installed_packages[package_name]['version']
+		for package in args['<package>']:
+			package_name = utils.get_package_name(package)
+			package_version = utils.get_package_version(package)
+			if package_name not in installed_packages \
+			or (package_version and package_version != installed_packages[package_name]["version"]):
+				raise Exception('package %s not installed' % package)
+		for package in args['<package>']:
+			package_name = utils.get_package_name(package)
+			package_version = utils.get_package_version(package)
+			if not package_version:
+				package_version = installed_packages[package_name]['version']
 			print('remove %s-%s' % (package_name, package_version))
 		if no or not (yes or utils.yes_no('continue?', default='n')):
 			return 0
-		for package_name in args['<package>']:
+		for package in args['<package>']:
+			package_name = utils.get_package_name(package)
 			utils.remove_package(package_name, installed_packages, prefix)
 			del installed_packages[package_name]
 			utils.save_installed_packages(installed_packages, db_fn)
@@ -241,10 +251,9 @@ def main():
 				package_name = utils.get_package_name(package)
 				package_version = utils.get_package_version(package)
 				if not package_name in installed_packages.keys() \
-				or package_version and installed_packages[package_name]["version"] != package_version:
+				or (package_version and package_version != installed_packages[package_name]["version"]):
 					packages = []
-					print('%s not installed' % package)
-					return 1
+					raise Exception('%s not installed' % package)
 		else:
 			packages = installed_packages.keys()
 		if packages:
