@@ -237,7 +237,10 @@ def main():
 		if args['<package>']:
 			packages = args['<package>']
 			for package in packages:
-				if not package in installed_packages.keys():
+				package_name = utils.get_package_name(package)
+				package_version = utils.get_package_version(package)
+				if not package_name in installed_packages.keys() \
+				or package_version and installed_packages[package_name]["version"] != package_version:
 					packages = []
 					print('%s not installed' % package)
 					return 1
@@ -246,17 +249,18 @@ def main():
 		if packages:
 			err = 0
 			for package in packages:
-				print('checking %s' % package)
-				for fn in installed_packages[package]['md5sums']:
+				package_name = utils.get_package_name(package)
+				print('checking %s' % package_name)
+				for fn in installed_packages[package_name]['md5sums']:
 					if not os.path.isfile('%s/%s' % (prefix, fn)):
-						print('%s: %s/%s does not exist' % (package, prefix, fn))
+						print('%s: %s/%s does not exist' % (package_name, prefix, fn))
 						err = 1
-					elif fn in installed_packages[package]['backup']:
+					elif fn in installed_packages[package_name]['backup']:
 						pass  # ignore config files
-					elif utils.get_md5sum('%s/%s' % (prefix, fn)) != installed_packages[package]['md5sums'][fn]:
-						print('%s: sum of %s/%s differs' % (package, prefix, fn))
+					elif utils.get_md5sum('%s/%s' % (prefix, fn)) != installed_packages[package_name]['md5sums'][fn]:
+						print('%s: sum of %s/%s differs' % (package_name, prefix, fn))
 						err = 1
-				print('check of %s complete' % package)
+				print('check of %s complete' % package_name)
 			if err:
 				return 1
 	logging.debug('exit')
