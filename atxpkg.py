@@ -240,6 +240,7 @@ def main():
 				if not package in installed_packages.keys():
 					packages = []
 					print('%s not installed' % package)
+					return 1
 		else:
 			packages = installed_packages.keys()
 		if packages:
