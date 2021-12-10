@@ -63,9 +63,11 @@ def get_repos(fn):
 	return ret
 
 
-def get_available_packages(repos):
+def get_available_packages(repos, offline=False):
 	ret = {}
 	for repo in repos:
+		if offline and repo.startswith(('http://', 'https://')):
+			continue
 		package_urls = get_repo_listing(repo)
 		#logging.debug(str(package_urls))
 		for package_url in package_urls:
@@ -79,7 +81,7 @@ def get_available_packages(repos):
 			if package_name in ret:
 				ret[package_name].append(package_url)
 			else:
-				ret[package_name] = [package_url, ]
+				ret[package_name] = [package_url]
 	return ret
 
 

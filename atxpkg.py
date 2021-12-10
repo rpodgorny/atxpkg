@@ -23,6 +23,7 @@ Options:
   --recursive        Recurse to directories.
   -y,--yes           Automatically answer yes to all questions.
   -n,--no            Automatically answer no to all questions.
+  --offline          Don't connect to online repositories.
 '''
 
 from version import __version__
@@ -72,8 +73,9 @@ def main():
 	installed_packages = utils.get_installed_packages(db_fn)
 	force = args['--force']
 	yes, no = args['--yes'], args['--no']
+	offline = args["--offline"]
 	if args['install']:
-		available_packages = utils.get_available_packages(repos)
+		available_packages = utils.get_available_packages(repos, offline)
 		for package in args['<package>']:
 			package_name = utils.get_package_name(package)
 			if package_name not in available_packages:
@@ -107,7 +109,7 @@ def main():
 				ver = utils.get_package_version(utils.get_package_fn(url))
 				logging.info('%s-%s is now installed' % (package_name, ver))
 	elif args['update']:
-		available_packages = utils.get_available_packages(repos)
+		available_packages = utils.get_available_packages(repos, offline)
 		if args['<package>']:
 			packages = args['<package>']
 			for package in packages:
@@ -202,7 +204,7 @@ def main():
 			del installed_packages[package_name]
 			utils.save_installed_packages(installed_packages, db_fn)
 	elif args['list_available']:
-		available_packages = utils.get_available_packages(repos)
+		available_packages = utils.get_available_packages(repos, offline)
 		for package_name in sorted(available_packages.keys()):
 			print(package_name)
 	elif args['list_installed']:
