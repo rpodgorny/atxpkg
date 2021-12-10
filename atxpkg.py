@@ -23,7 +23,6 @@ Options:
   --recursive        Recurse to directories.
   -y,--yes           Automatically answer yes to all questions.
   -n,--no            Automatically answer no to all questions.
-
 '''
 
 from version import __version__
