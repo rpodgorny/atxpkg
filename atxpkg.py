@@ -46,6 +46,7 @@ def main():
 	utils.logging_setup(log_level, log_fn, print_=True)
 	logging.info('*' * 40)
 	logging.info('starting atxpkg v%s' % __version__)
+	logging.info('argv: %s' % sys.argv)
 	logging.debug('args: %s' % dict(args))
 	if sys.platform == 'win32':
 		logging.debug('detected win32')
@@ -61,7 +62,6 @@ def main():
 		cache_dir = '/tmp/atxpkg/cache'
 	repos = utils.get_repos(repos_fn)
 	repos.append(cache_dir)
-	#logging.debug(str(args))
 	prefix = args['--prefix'] if args['--prefix'] else ''
 	if not os.path.isfile(db_fn):
 		logging.info('%s not found, creating empty one' % db_fn)
