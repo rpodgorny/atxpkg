@@ -115,17 +115,12 @@ def main():
 			for package in packages:
 				if '..' in package:
 					package_old, package_new = package.split('..')
-					package_name_old = utils.get_package_name(package_old)
-					package_version_old = utils.get_package_version(package_old)
-					package_name_new = utils.get_package_name(package_new)
-					package_version_new = utils.get_package_version(package_new)
 				else:
-					package_name_new = utils.get_package_name(package)
-					package_version_new = utils.get_package_version(package)
-					package_name_old = package_name_new
-					package_version_old = None
+					package_old = package_new = package
+				package_name_old = utils.get_package_name(package_old)
+				package_version_old = utils.get_package_version(package_old)
 				if package_name_old not in installed_packages \
-				or (package_version_old and package_version_old != installed_packages[package_name_old]["version"]):
+				or (package_version_old is not None and package_version_old != installed_packages[package_name_old]["version"]):
 					raise Exception('package %s not installed' % package_old)
 		else:
 			packages = installed_packages.keys()
