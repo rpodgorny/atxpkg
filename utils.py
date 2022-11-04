@@ -10,7 +10,6 @@ import glob
 import tempfile
 import subprocess
 import urllib.request
-import re
 import packaging.version
 
 
