@@ -110,8 +110,11 @@ def download_package(url, cache_dir):
 	if url.startswith(('http://', 'https://')):
 		fn = '%s/%s' % (cache_dir, get_package_fn(url))
 		if not os.path.isfile(fn):
-			logging.info('downloading %s to %s' % (url, fn))
-			urllib.request.urlretrieve(url, fn)
+			logging.info('downloading %s to %s_' % (url, fn))
+			if os.path.isfile(f"{fn}_"):
+				os.remove(f"{fn}_")
+			urllib.request.urlretrieve(url, f"{fn}_")
+			os.replace(f"{fn}_", fn)
 		else:
 			logging.info('using cached %s' % fn)
 		return fn
