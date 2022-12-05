@@ -166,10 +166,8 @@ def install_package(fn, prefix, force=False):
 				if os.path.isfile(f):
 					raise Exception('%s already exists!' % f)
 		for d in dirs:
-			try:
-				os.makedirs('%s/%s' % (prefix, d))
-			except:
-				pass
+			logging.debug("I %s/%s" % (prefix, d))
+			os.makedirs('%s/%s' % (prefix, d), exist_ok=True)
 		for f in files:
 			if f.startswith('.atxpkg_'):
 				continue
@@ -179,10 +177,7 @@ def install_package(fn, prefix, force=False):
 				logging.debug('S %s/%s %s/%s.atxpkg_save' % (prefix, f, prefix, f))
 				shutil.move('%s/%s' % (prefix, f), '%s/%s.atxpkg_save' % (prefix, f))
 			ret['md5sums'][f] = get_md5sum(f)
-			try:
-				os.makedirs(os.path.dirname('%s/%s' % (prefix, f)))
-			except:
-				pass
+			os.makedirs(os.path.dirname('%s/%s' % (prefix, f)), exist_ok=True)
 			logging.debug('I %s/%s' % (prefix, f))
 			try_delete('%s/%s' % (prefix, f))
 			#shutil.move(f, '%s/%s' % (prefix, f))
@@ -220,6 +215,9 @@ def update_package(fn, name_old, installed_package, prefix, force=False):
 			files_to_backup = getlines('.atxpkg_backup')
 		ret['backup'] = files_to_backup
 		dirs, files = get_recursive_listing(tmpdir)
+		for d in dirs:
+			logging.debug("I %s/%s" % (prefix, d))
+			os.makedirs('%s/%s' % (prefix, d), exist_ok=True)
 		if not force:
 			for f in files:
 				if check_file_existence(prefix, f, installed_package['md5sums'].keys()):
@@ -229,10 +227,7 @@ def update_package(fn, name_old, installed_package, prefix, force=False):
 				continue
 			sum_new = get_md5sum(f)
 			ret['md5sums'][f] = sum_new
-			try:
-				os.makedirs(os.path.dirname('%s/%s' % (prefix, f)))
-			except:
-				pass
+			os.makedirs(os.path.dirname('%s/%s' % (prefix, f)), exist_ok=True)
 			if os.path.isfile('%s/%s' % (prefix, f)):
 				skip = False
 				backup = False
@@ -262,11 +257,6 @@ def update_package(fn, name_old, installed_package, prefix, force=False):
 				try_delete('%s/%s' % (prefix, f))
 				#shutil.move(f, '%s/%s' % (prefix, f))
 				shutil.copy(f, '%s/%s' % (prefix, f))
-		for d in dirs:
-			try:
-				os.makedirs('%s/%s' % (prefix, d))
-			except:
-				pass
 		# remove files which are no longer in the new version
 		files_to_backup_old = installed_package['backup'] if 'backup' in installed_package else []
 		for fn, md5sum in installed_package['md5sums'].items():
@@ -287,11 +277,12 @@ def update_package(fn, name_old, installed_package, prefix, force=False):
 			else:
 				logging.debug('removing %s/%s' % (prefix, fn))
 				try_delete('%s/%s' % (prefix, fn))
+			dn = os.path.dirname(fn)
+			if dn not in dirs:
+				fdn = os.path.dirname('%s/%s' % (prefix, fn))
+				logging.debug('removing dirs %s' % fdn)
 			try:
-				dn = os.path.dirname(fn)
-				if dn not in dirs:
-					fdn = os.path.dirname('%s/%s' % (prefix, fn))
-					os.removedirs(fdn)
+				os.removedirs(fdn)
 			except:
 				pass
 	finally:
