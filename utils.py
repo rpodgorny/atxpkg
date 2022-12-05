@@ -75,7 +75,7 @@ def get_available_packages(repos, offline=False):
 				logging.debug('%s not valid package filename' % package_fn)
 				continue
 			package_name = get_package_name(package_fn)
-			package_version = get_package_version(package_fn)
+			#package_version = get_package_version(package_fn)
 			#print(package_name, package_version)
 			if package_name in ret:
 				ret[package_name].append(package_url)
