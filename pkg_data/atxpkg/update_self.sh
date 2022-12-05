@@ -1,14 +1,9 @@
 #!/bin/sh
 set -e -x
 
-#if [ -d /cygdrive/c/atxpkg ]; then
-#  echo 'atxpkg already installed?'
-#  exit 0
-#fi
-
 urlbase=https://atxpkg.asterix.cz
 pkg=atxpkg
-ver=3.6-1
+ver=4.0-1
 fn=$pkg-$ver.atxpkg.zip
 #urlbase=https://atxpkg-dev.asterix.cz
 #pkg=atxpkg.dev
@@ -21,10 +16,8 @@ rm -rf atxpkg.tmp
 mkdir atxpkg.tmp
 cd atxpkg.tmp
 
-#wget $urlbase/$fn
 wget --no-check-certificate $urlbase/$fn
 
-#wget https://atxpkg.asterix.cz/7za.exe
 wget --no-check-certificate https://atxpkg.asterix.cz/7za.exe
 
 cp /cygdrive/c/atxpkg/installed.json ./ || true
@@ -51,8 +44,3 @@ rm -rf atxpkg.tmp
 cd /cygdrive/c/atxpkg
 ./add_to_path.bat
 cd -
-
-net stop cygsshd || true
-net start cygsshd || true
-
-echo "Je nutne se odpojit (ctrl-d) a znovu se pripojit"
