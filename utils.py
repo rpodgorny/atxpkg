@@ -262,6 +262,11 @@ def update_package(fn, name_old, installed_package, prefix, force=False):
 				try_delete('%s/%s' % (prefix, f))
 				#shutil.move(f, '%s/%s' % (prefix, f))
 				shutil.copy(f, '%s/%s' % (prefix, f))
+		for d in dirs:
+			try:
+				os.makedirs('%s/%s' % (prefix, d))
+			except:
+				pass
 		# remove files which are no longer in the new version
 		files_to_backup_old = installed_package['backup'] if 'backup' in installed_package else []
 		for fn, md5sum in installed_package['md5sums'].items():
