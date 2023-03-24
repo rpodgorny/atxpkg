@@ -8,7 +8,9 @@ rm -rf build dist
 pip install --no-cache-dir -i http://${PYPI_CACHE}:3141/root/pypi/+simple/ --trusted-host ${PYPI_CACHE} "pyinstaller==5.8.0"
 pip install --no-cache-dir -i http://${PYPI_CACHE}:3141/root/pypi/+simple/ --trusted-host ${PYPI_CACHE} -r requirements.txt
 
-pyinstaller --noconfirm --clean --noupx atxpkg.py
+python version.py | tee __v.txt
+pyinstaller --noconfirm --clean --noupx --version-file __v.txt atxpkg.py
+rm -rf __v.txt
 
 ./merge_dist.sh
 
