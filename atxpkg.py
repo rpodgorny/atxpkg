@@ -24,6 +24,7 @@ Options:
   -y,--yes           Automatically answer yes to all questions.
   -n,--no            Automatically answer no to all questions.
   --offline          Don't connect to online repositories.
+  --unverified-ssl   Don't verify ssl certificate validity.
 '''
 
 from version import __version__
@@ -74,6 +75,10 @@ def main():
 	force = args['--force']
 	yes, no = args['--yes'], args['--no']
 	offline = args["--offline"]
+	if args["--unverified-ssl"]:
+		logging.info("overiding ssl context to be unverified")
+		import ssl
+		ssl._create_default_https_context = ssl._create_unverified_context
 	if args['install']:
 		available_packages = utils.get_available_packages(repos, offline)
 		for package in args['<package>']:
