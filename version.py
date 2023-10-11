@@ -1,6 +1,6 @@
 import time
 
-__version__ = "4.2"
+__version__ = "4.3"
 
 
 def main():
