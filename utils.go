@@ -310,10 +310,13 @@ func DownloadPackageIfNeeded(url, cacheDir string) (string, error) {
 
 	bar := progressbar.DefaultBytes(resp.ContentLength, "")
 
-	//if _, err := io.Copy(f, resp.Body); err != nil {
 	if _, err := io.Copy(io.MultiWriter(f, bar), resp.Body); err != nil {
 		return "", errors.Wrapf(err, "io.Copy error")
 	}
+
+	// the file needs to be closed before rename - TODO: does it clobber with the defer above?
+	f.Close()
+
 	if err := os.Rename(fn+"_", fn); err != nil {
 		return "", errors.Wrapf(err, "os.Rename error")
 	}
