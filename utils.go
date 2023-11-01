@@ -123,7 +123,7 @@ func isEmptyDir(path string) (bool, error) {
 func readLines(fn string) ([]string, error) {
 	f, err := os.Open(fn)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w", err)
 	}
 	defer f.Close()
 
@@ -133,7 +133,7 @@ func readLines(fn string) ([]string, error) {
 		lines = append(lines, scanner.Text())
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w", err)
 	}
 	return lines, nil
 }
@@ -141,29 +141,29 @@ func readLines(fn string) ([]string, error) {
 func copyFile(fromFn string, toFn string) error {
 	src, err := os.Open(fromFn)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w", err)
 	}
 	defer src.Close()
 
 	dst, err := os.Create(toFn)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w", err)
 	}
 	defer dst.Close()
 
 	if _, err := io.Copy(dst, src); err != nil {
-		return err
+		return fmt.Errorf("%w", err)
 	}
 
 	fi, err := os.Stat(fromFn)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w", err)
 	}
 	if err := os.Chmod(toFn, fi.Mode()); err != nil {
-		return err
+		return fmt.Errorf("%w", err)
 	}
 	if err := os.Chtimes(toFn, fi.ModTime(), fi.ModTime()); err != nil {
-		return err
+		return fmt.Errorf("%w", err)
 	}
 
 	return nil
@@ -172,7 +172,7 @@ func copyFile(fromFn string, toFn string) error {
 func GetRepos(fn string) ([]string, error) {
 	lines, err := readLines(fn)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w", err)
 	}
 	lines = lo.Map(lines, func(x string, _ int) string {
 		return strings.TrimSpace(x)
@@ -210,13 +210,13 @@ func GetAvailablePackages(repos []string, offline bool) map[string][]string {
 func getRepoListingHttp(url string) ([]string, error) {
 	resp, err := http.Get(url)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w", err)
 	}
 
 	re := regexp.MustCompile(`[\w\-\._:/]+\.atxpkg\.\w+`)
@@ -232,7 +232,7 @@ func getRepoListingDir(path string) ([]string, error) {
 	ret := []string{}
 	err := filepath.Walk(path, func(path string, fi fs.FileInfo, err error) error {
 		if err != nil {
-			return err
+			return fmt.Errorf("%w", err)
 		}
 		if fi.IsDir() {
 			return nil
@@ -244,7 +244,7 @@ func getRepoListingDir(path string) ([]string, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w", err)
 	}
 	return ret, nil
 }
@@ -584,12 +584,12 @@ func RemovePackage(packageName string, installedPackages map[string]InstalledPac
 		if backup {
 			log.Printf("%s changed, saving as %s.atxpkg_backup\n", targetFn, targetFn)
 			if err := os.Rename(targetFn, targetFn+".atxpkg_backup"); err != nil {
-				return err
+				return fmt.Errorf("%w", err)
 			}
 		} else {
 			log.Printf("DF %s\n", targetFn)
 			if err := tryDelete(targetFn); err != nil {
-				return err
+				return fmt.Errorf("%w", err)
 			}
 		}
 
@@ -600,7 +600,7 @@ func RemovePackage(packageName string, installedPackages map[string]InstalledPac
 		if empty, err := isEmptyDir(dirName); empty && err == nil {
 			log.Printf("DD %s\n", dirName)
 			if err := tryDelete(dirName); err != nil {
-				return err
+				return fmt.Errorf("%w", err)
 			}
 		}
 	}
@@ -620,13 +620,13 @@ func MergeConfigPackage(packageName string, installedPackages map[string]Install
 				log.Printf("found %s, running merge\n", fnFromFull)
 
 				if err := merge(fnFull, fnFromFull); err != nil {
-					return err
+					return fmt.Errorf("%w", err)
 				}
 
 				if YesNo("delete "+fnFromFull+"?", "n") {
 					log.Printf("D %s\n", fnFromFull)
 					if err := os.Remove(fnFromFull); err != nil {
-						return err
+						return fmt.Errorf("%w", err)
 					}
 				}
 			}
@@ -693,11 +693,11 @@ func GetRecursiveListing(path string) (dirs []string, files []string, _ error) {
 	var retDirs, retFiles []string
 	err := filepath.Walk(path, func(filePath string, fi fs.FileInfo, err error) error {
 		if err != nil {
-			return err
+			return fmt.Errorf("%w", err)
 		}
 		relPath, err := filepath.Rel(path, filePath)
 		if err != nil {
-			return err
+			return fmt.Errorf("%w", err)
 		}
 		if relPath == "." {
 			return nil
@@ -710,7 +710,7 @@ func GetRecursiveListing(path string) (dirs []string, files []string, _ error) {
 		return nil
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("%w", err)
 	}
 	return retDirs, retFiles, nil
 }
@@ -729,13 +729,13 @@ func GetInstalledPackages(dbFn string) (map[string]InstalledPackage, error) {
 
 	f, err := os.Open(dbFn)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w", err)
 	}
 	defer f.Close()
 
 	var installedPackages map[string]InstalledPackage
 	if err := json.NewDecoder(f).Decode(&installedPackages); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w", err)
 	}
 
 	return installedPackages, nil
@@ -744,14 +744,14 @@ func GetInstalledPackages(dbFn string) (map[string]InstalledPackage, error) {
 func SaveInstalledPackages(installedPackages map[string]InstalledPackage, dbFn string) error {
 	f, err := os.Create(dbFn)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w", err)
 	}
 	defer f.Close()
 
 	encoder := json.NewEncoder(f)
 	encoder.SetIndent("", "  ")
 	if err := encoder.Encode(installedPackages); err != nil {
-		return err
+		return fmt.Errorf("%w", err)
 	}
 	return nil
 }
@@ -856,14 +856,14 @@ func hasVersion(pkgSpec string) bool {
 func unzipTo(fnZip string, path string) error {
 	r, err := zip.OpenReader(fnZip)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w", err)
 	}
 	defer r.Close()
 
 	for _, file := range r.File {
 		rc, err := file.Open()
 		if err != nil {
-			return err
+			return fmt.Errorf("%w", err)
 		}
 		defer rc.Close()
 
@@ -871,24 +871,24 @@ func unzipTo(fnZip string, path string) error {
 		fmt.Println("UNZIP", file.Name)
 		if file.FileInfo().IsDir() {
 			if err := os.Mkdir(filePath, os.ModePerm); err != nil {
-				return err
+				return fmt.Errorf("%w", err)
 			}
 		} else {
 			f, err := os.Create(filePath)
 			if err != nil {
-				return err
+				return fmt.Errorf("%w", err)
 			}
 			defer f.Close()
 
 			if _, err := io.Copy(f, rc); err != nil {
-				return err
+				return fmt.Errorf("%w", err)
 			}
 		}
 		if err := os.Chmod(filePath, file.Mode()); err != nil {
-			return err
+			return fmt.Errorf("%w", err)
 		}
 		if err := os.Chtimes(filePath, file.Modified, file.Modified); err != nil {
-			return err
+			return fmt.Errorf("%w", err)
 		}
 	}
 	return nil
@@ -958,7 +958,7 @@ func InstallPackages(
 		packageName, packageVersion := SplitPackageNameVersion(GetPackageFn(localFn))
 		packageInfo, err := InstallPackage(localFn, prefix, force)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%w", err)
 		}
 		packageInfo.T = GetUnixTime()
 		installedPackages[packageName] = *packageInfo
@@ -1178,7 +1178,7 @@ func ShowUntracked(
 	for _, path := range paths {
 		_, files, err := GetRecursiveListing(prefix + "/" + path)
 		if err != nil {
-			return err
+			return fmt.Errorf("%w", err)
 		}
 		for _, fn := range files {
 			fn = strings.TrimPrefix(fn, prefix+"/")
@@ -1205,7 +1205,7 @@ func MergeConfig(
 	for _, p := range packages {
 		packageName := GetPackageName(p)
 		if err := MergeConfigPackage(packageName, installedPackages, prefix); err != nil {
-			return err
+			return fmt.Errorf("%w", err)
 		}
 	}
 	return nil
