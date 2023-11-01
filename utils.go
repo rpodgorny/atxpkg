@@ -457,23 +457,24 @@ func UpdatePackage(fn, nameOld string, installedPackage InstalledPackage, prefix
 		return !strings.HasPrefix(x, ".atxpkg_")
 	})
 
-	for _, d := range dirs {
-		targetDir := filepath.Join(prefix, d)
-		log.Printf("I %s\n", targetDir)
-		if DirExists(targetDir) {
-			continue
-		}
-		if err := os.Mkdir(targetDir, os.ModePerm); err != nil {
-			return nil, fmt.Errorf("%w", err)
+	for _, f := range files {
+		targetFn := filepath.Join(prefix, f)
+		if FileExists(targetFn) {
+			if _, ok := installedPackage.Md5sums[f]; !ok && !force {
+				return nil, fmt.Errorf("%s already exists but is not part of original package", f)
+			}
 		}
 	}
 
-	if !force {
-		for _, fn := range files {
-			if FileExists(fn) {
-				return nil, errors.Errorf("file exists: %v", fn)
+	for _, d := range dirs {
+		targetDir := filepath.Join(prefix, d)
+		log.Printf("UD %s\n", targetDir)
+		if !DirExists(targetDir) {
+			if err := os.Mkdir(targetDir, os.ModePerm); err != nil {
+				return nil, fmt.Errorf("%w", err)
 			}
 		}
+		// TODO: change perms and times of dir according to new package
 	}
 
 	for _, f := range files {
@@ -481,36 +482,28 @@ func UpdatePackage(fn, nameOld string, installedPackage InstalledPackage, prefix
 		if err != nil {
 			return nil, fmt.Errorf("%w", err)
 		}
-
 		ret.Md5sums[f] = sumNew
 
 		targetFn := filepath.Join(prefix, f)
-		if FileExists(targetFn) {
-			sumCurrent, err := GetMD5Sum(targetFn)
-			if err != nil {
-				return nil, fmt.Errorf("%w", err)
-			}
-
-			if _, ok := installedPackage.Md5sums[f]; ok {
-				if sumCurrent == sumNew {
-					log.Printf("S %s\n", targetFn)
+		if FileExists(targetFn) && (slices.Contains(ret.Backup, f) || slices.Contains(installedPackage.Backup, f)) {
+			if sumOriginal, ok := installedPackage.Md5sums[f]; ok {
+				sumCurrent, err := GetMD5Sum(targetFn)
+				if err != nil {
+					return nil, fmt.Errorf("%w", err)
+				}
+				if sumOriginal == sumCurrent || sumCurrent == sumNew {
 					continue
 				}
-			}
-
-			if slices.Contains(ret.Backup, f) {
 				log.Printf("saving changed %s as %s.atxpkg_save\n", targetFn, targetFn)
 				if err := os.Rename(targetFn, targetFn+".atxpkg_save"); err != nil {
 					return nil, fmt.Errorf("%w", err)
 				}
 			}
-
-			log.Printf("U %s\n", targetFn)
-			if err := tryDelete(targetFn); err != nil {
-				return nil, fmt.Errorf("%w", err)
-			}
 		}
-
+		log.Printf("U %s\n", targetFn)
+		if err := tryDelete(targetFn); err != nil {
+			return nil, fmt.Errorf("%w", err)
+		}
 		if err := copyFile(filepath.Join(tmpDir, f), targetFn); err != nil {
 			return nil, fmt.Errorf("%w", err)
 		}
