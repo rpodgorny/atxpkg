@@ -697,18 +697,13 @@ func GetRecursiveListing(path string) (dirs []string, files []string, _ error) {
 if err != nil {
 			return fmt.Errorf("%w", err)
 		}
-		/*relPath, err := filepath.Rel(path, filePath)
-		if err != nil {
-			return fmt.Errorf("%w", err)
-		}*/
-		relPath := strings.TrimPrefix(filePath, path)
-		if relPath == "." {
+		if filePath == "." {
 			return nil
 		}
 		if de.IsDir() {
-			retDirs = append(retDirs, filepath.ToSlash(relPath))
+			retDirs = append(retDirs, filepath.ToSlash(filePath))
 		} else {
-			retFiles = append(retFiles, filepath.ToSlash(relPath))
+			retFiles = append(retFiles, filepath.ToSlash(filePath))
 		}
 		return nil
 	})
