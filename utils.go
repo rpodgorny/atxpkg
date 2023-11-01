@@ -1034,24 +1034,37 @@ func UpdatePackages(
 			return nil, errors.Errorf("package %s not available", pu.nameNew)
 		}
 		if pu.versionNew == "" {
-			pu.versionNew = GetMaxVersion(availablePackages[pu.nameNew])                // TODO: this does not modify the original but still the following code depends on it - solve better
-			packageUpdates[i].versionNew = GetMaxVersion(availablePackages[pu.nameNew]) // TODO: ugly shit
+			// TODO: this does not modify the original but still the following code depends on it - solve better
+			pu.versionNew = GetMaxVersion(availablePackages[pu.nameNew])
+			// TODO: ugly shit
+			packageUpdates[i].versionNew = GetMaxVersion(availablePackages[pu.nameNew])
 		}
 		url := GetSpecificVersionURL(availablePackages[pu.nameNew], pu.versionNew)
 		if url == "" {
 			return nil, errors.Errorf("package %s-%s not available", pu.nameNew, pu.versionNew)
 		}
 		//pu.url = url
-		packageUpdates[i].url = url // TODO: ugly shit
-
-		if force || pu.versionNew != installedPackages[pu.nameOld].Version {
-			fmt.Printf("update %s-%s -> %s-%s\n", pu.nameOld, pu.versionOld, pu.nameNew, pu.versionNew)
-		}
+		// TODO: ugly shit
+		packageUpdates[i].url = url
 	}
+
+	packageUpdates = lo.Filter(packageUpdates, func(pu packageUpdate, _ int) bool {
+		if force {
+			return true
+		}
+		if pu.nameOld != pu.nameNew || pu.versionOld != pu.versionOld {
+			return true
+		}
+		return false
+	})
 
 	if len(packageUpdates) == 0 {
 		fmt.Println("nothing to update")
 		return installedPackages, nil
+	}
+
+	for _, pu := range packageUpdates {
+		fmt.Printf("update %s-%s -> %s-%s\n", pu.nameOld, pu.versionOld, pu.nameNew, pu.versionNew)
 	}
 
 	if !no && !(yes || YesNo("continue?", "y")) {
