@@ -65,6 +65,10 @@ func CompareVersions(v1, v2 string) int {
 	return CompareSlices(SplitVer(v1), SplitVer(v2))
 }
 
+func GetUnixTime() float64 {
+	return float64(time.Now().UnixNano()) / 1e9
+}
+
 // TODO: find some function for this in "lo"
 func UnwrapOrEmpty[T any](res T, err error) T {
 	var empty T
@@ -276,11 +280,11 @@ func DownloadPackageIfNeeded(url, cacheDir string) (string, error) {
 	}
 	log.Printf("downloading %s to %s\n", url, fn)
 	resumeFrom := 0
-	if FileExists(fn+"_") {
+	if FileExists(fn + "_") {
 		if resp, err := http.Head(url); err == nil {
 			defer resp.Body.Close()
 			if resp.StatusCode == http.StatusOK && resp.Header.Get("Accept-Ranges") == "bytes" {
-				if fi, err := os.Stat(fn+"_"); err == nil {
+				if fi, err := os.Stat(fn + "_"); err == nil {
 					resumeFrom = int(fi.Size())
 				}
 			}
@@ -289,17 +293,17 @@ func DownloadPackageIfNeeded(url, cacheDir string) (string, error) {
 
 	f, err := os.OpenFile(fn+"_", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
-		return "", errors.Wrapf(err, "OpenFile error")
+		return "", fmt.Errorf("%w", err)
 	}
 	defer f.Close()
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return "", errors.Wrapf(err, "NewRequest error")
+		return "", fmt.Errorf("%w", err)
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", errors.Wrapf(err, "http.DefaultClient error")
+		return "", fmt.Errorf("%w", err)
 	}
 	defer resp.Body.Close()
 
@@ -311,14 +315,14 @@ func DownloadPackageIfNeeded(url, cacheDir string) (string, error) {
 	bar := progressbar.DefaultBytes(resp.ContentLength, "")
 
 	if _, err := io.Copy(io.MultiWriter(f, bar), resp.Body); err != nil {
-		return "", errors.Wrapf(err, "io.Copy error")
+		return "", fmt.Errorf("%w", err)
 	}
 
 	// the file needs to be closed before rename - TODO: does it clobber with the defer above?
 	f.Close()
 
 	if err := os.Rename(fn+"_", fn); err != nil {
-		return "", errors.Wrapf(err, "os.Rename error")
+		return "", fmt.Errorf("%w", err)
 	}
 	return fn, nil
 }
@@ -333,10 +337,10 @@ func tryDelete(fn string) error {
 			delFn += "_delete"
 		}
 		if err := os.Rename(fn, delFn); err != nil {
-			return errors.Wrapf(err, "os.Rename error")
+			return fmt.Errorf("%w", err)
 		}
 		if err := os.Remove(delFn); err != nil {
-			return errors.Wrapf(err, "os.Remove error")
+			return fmt.Errorf("%w", err)
 		}
 	}
 	return nil
@@ -354,12 +358,12 @@ func InstallPackage(fn, prefix string, force bool) (*InstalledPackage, error) {
 
 	tmpDir, err := os.MkdirTemp("", "atxpkg")
 	if err != nil {
-		return nil, errors.Wrapf(err, "os.Mkdir error")
+		return nil, fmt.Errorf("%w", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
 	if err := unzipTo(fn, tmpDir); err != nil {
-		return nil, errors.Wrapf(err, "unzipTo error")
+		return nil, fmt.Errorf("%w", err)
 	}
 
 	backupFn := filepath.Join(tmpDir, ".atxpkg_backup")
@@ -369,7 +373,7 @@ func InstallPackage(fn, prefix string, force bool) (*InstalledPackage, error) {
 
 	dirs, files, err := GetRecursiveListing(tmpDir)
 	if err != nil {
-		return nil, errors.Wrapf(err, "GetRecursiveListing error")
+		return nil, fmt.Errorf("%w", err)
 	}
 	files = lo.Filter(files, func(x string, _ int) bool {
 		return !strings.HasPrefix(x, ".atxpkg_")
@@ -384,24 +388,24 @@ func InstallPackage(fn, prefix string, force bool) (*InstalledPackage, error) {
 	for _, d := range dirs {
 		log.Printf("I %s\n", d)
 		if err := os.MkdirAll(prefix+"/"+d, os.ModePerm); err != nil {
-			return nil, errors.Wrapf(err, "os.MkdirAll error")
+			return nil, fmt.Errorf("%w", err)
 		}
 		srcInfo, err := os.Stat(tmpDir + "/" + d)
 		if err != nil {
-			return nil, errors.Wrapf(err, "os.Stat error")
+			return nil, fmt.Errorf("%w", err)
 		}
 		if err := os.Chmod(prefix+"/"+d, srcInfo.Mode()); err != nil {
-			return nil, errors.Wrapf(err, "os.Chmod error")
+			return nil, fmt.Errorf("%w", err)
 		}
 		if err := os.Chtimes(prefix+"/"+d, srcInfo.ModTime(), srcInfo.ModTime()); err != nil {
-			return nil, errors.Wrapf(err, "os.Chtimes error")
+			return nil, fmt.Errorf("%w", err)
 		}
 	}
 	for _, f := range files {
 		log.Printf("I %s\n", f)
 		sum, err := GetMD5Sum(tmpDir + "/" + f)
 		if err != nil {
-			return nil, errors.Wrapf(err, "GetMD5Sum error")
+			return nil, fmt.Errorf("%w", err)
 		}
 		ret.Md5sums[f] = sum
 
@@ -409,15 +413,15 @@ func InstallPackage(fn, prefix string, force bool) (*InstalledPackage, error) {
 		if FileExists(backupFn) && slices.Contains(ret.Backup, f) {
 			log.Printf("saving untracked %s as %s.atxpkg_save\n", backupFn, backupFn)
 			if err := os.Rename(backupFn, backupFn+".atxpkg_save"); err != nil {
-				return nil, errors.Wrapf(err, "os.Rename error")
+				return nil, fmt.Errorf("%w", err)
 			}
 		}
 		targetFn := fmt.Sprintf("%s/%s", prefix, f)
 		if err := tryDelete(targetFn); err != nil {
-			return nil, errors.Wrapf(err, "tryDelete error")
+			return nil, fmt.Errorf("%w", err)
 		}
 		if err := copyFile(tmpDir+"/"+f, targetFn); err != nil {
-			return nil, errors.Wrapf(err, "copyFile error")
+			return nil, fmt.Errorf("%w", err)
 		}
 	}
 	return ret, nil
@@ -664,7 +668,7 @@ func merge(fn1, fn2 string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		return errors.Wrapf(err, "error running merge command")
+		return fmt.Errorf("%w", err)
 	}
 	return nil
 }
@@ -720,7 +724,7 @@ type InstalledPackage struct {
 
 func GetInstalledPackages(dbFn string) (map[string]InstalledPackage, error) {
 	if _, err := os.Stat(dbFn); os.IsNotExist(err) {
-		return nil, errors.Wrapf(err, "package database not found (%s)", dbFn)
+		return nil, fmt.Errorf("%w", err)
 	}
 
 	f, err := os.Open(dbFn)
@@ -764,12 +768,12 @@ func GetSpecificVersionURL(urls []string, version string) string {
 func CleanCache(cacheDir string) error {
 	files, err := os.ReadDir(cacheDir)
 	if err != nil {
-		return errors.Wrapf(err, "error reading cache directory %s", cacheDir)
+		return fmt.Errorf("%w", err)
 	}
 	for _, file := range files {
 		filePath := filepath.Join(cacheDir, file.Name())
 		if err := os.Remove(filePath); err != nil {
-			return errors.Wrapf(err, "error removing file %s", filePath)
+			return fmt.Errorf("%w", err)
 		}
 		log.Printf("D %s\n", filePath)
 	}
@@ -943,7 +947,7 @@ func InstallPackages(
 	for _, url := range urlsToInstall {
 		localFn, err := DownloadPackageIfNeeded(url, cacheDir)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to download %s or retrieve from %s", url, cacheDir)
+			return nil, fmt.Errorf("%w", err)
 		}
 		localFnsToInstall = append(localFnsToInstall, localFn)
 	}
@@ -956,7 +960,7 @@ func InstallPackages(
 		if err != nil {
 			return nil, err
 		}
-		packageInfo.T = float64(time.Now().UnixNano()) / 1e9
+		packageInfo.T = GetUnixTime()
 		installedPackages[packageName] = *packageInfo
 		fmt.Printf("%s-%s is now installed\n", packageName, packageVersion)
 	}
@@ -1070,7 +1074,7 @@ func UpdatePackages(
 	for i, pu := range packageUpdates {
 		localFn, err := DownloadPackageIfNeeded(pu.url, cacheDir)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to download %v or retrieve from %v", pu.url, cacheDir)
+			return nil, fmt.Errorf("%w", err)
 		}
 		//pu.localFn = localFn
 		packageUpdates[i].localFn = localFn // TODO: ugly shit
@@ -1083,9 +1087,9 @@ func UpdatePackages(
 	for _, pu := range packageUpdates {
 		packageInfo, err := UpdatePackage(pu.localFn, pu.nameOld, installedPackages[pu.nameOld], prefix, force)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to update package %v", pu.nameOld)
+			return nil, fmt.Errorf("%w", err)
 		}
-		packageInfo.T = float64(time.Now().UnixNano()) / 1e9
+		packageInfo.T = GetUnixTime()
 		delete(installedPackages, pu.nameOld)
 		installedPackages[pu.nameNew] = *packageInfo
 		fmt.Printf("%s-%s updated to %s-%s\n", pu.nameOld, pu.versionOld, pu.nameNew, pu.versionNew)
@@ -1124,7 +1128,7 @@ func RemovePackages(
 	for _, p := range packages {
 		packageName := GetPackageName(p)
 		if err := RemovePackage(packageName, installedPackages, prefix); err != nil {
-			return nil, errors.Wrapf(err, "failed to remove package %v", packageName)
+			return nil, fmt.Errorf("%w", err)
 		}
 		delete(installedPackages, packageName)
 	}
