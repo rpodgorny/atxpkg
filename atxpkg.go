@@ -52,6 +52,8 @@ func intMain() int {
 	//slog.SetFlags(slog.Ldate | slog.Ltime | slog.Lshortfile)
 	//slog.SetPrefix("[atxpkg] ")
 
+	slog.Info(fmt.Sprintf("starting atxpkg v%s", VERSION))
+
 	//slog.Debug("args", "args", args)
 
 	force := lo.Must(args.Bool("--force"))
@@ -80,7 +82,7 @@ func intMain() int {
 		slog.Info("detected non-win32")
 		dbFn = "/tmp/atxpkg/installed.json"
 		reposFn = "/tmp/atxpkg/repos.txt"
-		prefix = ""
+		prefix = "/"
 		cacheDir = "/tmp/atxpkg/cache"
 	}
 

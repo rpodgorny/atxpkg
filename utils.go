@@ -366,8 +366,7 @@ func InstallPackage(fn, prefix string, force bool) (*InstalledPackage, error) {
 		return nil, fmt.Errorf("%w", err)
 	}
 
-	backupFn := filepath.Join(tmpDir, ".atxpkg_backup")
-	if content, err := readLines(backupFn); err == nil {
+	if content, err := readLines(tmpDir+"/.atxpkg_backup"); err == nil {
 		ret.Backup = content
 	}
 
@@ -379,9 +378,10 @@ func InstallPackage(fn, prefix string, force bool) (*InstalledPackage, error) {
 		return !strings.HasPrefix(x, ".atxpkg_")
 	})
 	if !force {
-		for _, fn := range files {
-			if FileExists(prefix + "/" + fn) {
-				return nil, errors.Errorf("file exists: %s", prefix+"/"+fn)
+		for _, f := range files {
+			targetFn := prefix+"/"+f
+			if FileExists(targetFn) {
+				return nil, errors.Errorf("file exists: %s", targetFn)
 			}
 		}
 	}
@@ -390,7 +390,7 @@ func InstallPackage(fn, prefix string, force bool) (*InstalledPackage, error) {
 		if err := os.MkdirAll(prefix+"/"+d, os.ModePerm); err != nil {
 			return nil, fmt.Errorf("%w", err)
 		}
-		srcInfo, err := os.Stat(tmpDir + "/" + d)
+		srcInfo, err := os.Stat(tmpDir+"/"+d)
 		if err != nil {
 			return nil, fmt.Errorf("%w", err)
 		}
@@ -403,20 +403,19 @@ func InstallPackage(fn, prefix string, force bool) (*InstalledPackage, error) {
 	}
 	for _, f := range files {
 		log.Printf("I %s\n", f)
-		sum, err := GetMD5Sum(tmpDir + "/" + f)
+		sum, err := GetMD5Sum(tmpDir+"/"+f)
 		if err != nil {
 			return nil, fmt.Errorf("%w", err)
 		}
 		ret.Md5sums[f] = sum
 
-		backupFn := filepath.Join(prefix, f)
-		if FileExists(backupFn) && slices.Contains(ret.Backup, f) {
-			log.Printf("saving untracked %s as %s.atxpkg_save\n", backupFn, backupFn)
-			if err := os.Rename(backupFn, backupFn+".atxpkg_save"); err != nil {
+		targetFn := fmt.Sprintf("%s/%s", prefix, f)
+		if FileExists(targetFn) && slices.Contains(ret.Backup, f) {
+			log.Printf("saving untracked %s as %s.atxpkg_save\n", targetFn, targetFn)
+			if err := os.Rename(targetFn, targetFn+".atxpkg_save"); err != nil {
 				return nil, fmt.Errorf("%w", err)
 			}
 		}
-		targetFn := fmt.Sprintf("%s/%s", prefix, f)
 		if err := tryDelete(targetFn); err != nil {
 			return nil, fmt.Errorf("%w", err)
 		}
@@ -448,8 +447,7 @@ func UpdatePackage(fn, nameOld string, installedPackage InstalledPackage, prefix
 		return nil, fmt.Errorf("%w", err)
 	}
 
-	backupFn := filepath.Join(tmpDir, ".atxpkg_backup")
-	if content, err := readLines(backupFn); err == nil {
+	if content, err := readLines(tmpDir+"/.atxpkg_backup"); err == nil {
 		ret.Backup = content
 	}
 
@@ -460,16 +458,16 @@ func UpdatePackage(fn, nameOld string, installedPackage InstalledPackage, prefix
 	files = lo.Filter(files, func(x string, _ int) bool {
 		return !strings.HasPrefix(x, ".atxpkg_")
 	})
-
-	for _, f := range files {
-		targetFn := filepath.Join(prefix, f)
-		if FileExists(targetFn) {
-			if _, ok := installedPackage.Md5sums[f]; !ok && !force {
-				return nil, fmt.Errorf("%s already exists but is not part of original package", f)
+	if !force {
+		for _, f := range files {
+			targetFn := prefix+"/"+f
+			if FileExists(targetFn) {
+				if _, ok := installedPackage.Md5sums[f]; !ok {
+					return nil, fmt.Errorf("%s already exists but is not part of original package", f)
+				}
 			}
 		}
 	}
-
 	for _, d := range dirs {
 		targetDir := filepath.Join(prefix, d)
 		log.Printf("UD %s\n", targetDir)
