@@ -289,17 +289,17 @@ func DownloadPackageIfNeeded(url, cacheDir string) (string, error) {
 
 	f, err := os.OpenFile(fn+"_", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "OpenFile error")
 	}
 	defer f.Close()
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "NewRequest error")
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "http.DefaultClient error")
 	}
 	defer resp.Body.Close()
 
@@ -312,10 +312,10 @@ func DownloadPackageIfNeeded(url, cacheDir string) (string, error) {
 
 	//if _, err := io.Copy(f, resp.Body); err != nil {
 	if _, err := io.Copy(io.MultiWriter(f, bar), resp.Body); err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "io.Copy error")
 	}
 	if err := os.Rename(fn+"_", fn); err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "os.Rename error")
 	}
 	return fn, nil
 }
