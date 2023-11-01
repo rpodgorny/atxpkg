@@ -1055,7 +1055,7 @@ func UpdatePackages(
 		if force {
 			return true
 		}
-		if pu.nameOld != pu.nameNew || pu.versionOld != pu.versionOld {
+		if pu.nameOld != pu.nameNew || pu.versionOld != pu.versionNew {
 			return true
 		}
 		return false
