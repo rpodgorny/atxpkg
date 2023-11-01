@@ -330,10 +330,10 @@ func tryDelete(fn string) error {
 			delFn += "_delete"
 		}
 		if err := os.Rename(fn, delFn); err != nil {
-			return err
+			return errors.Wrapf(err, "os.Rename error")
 		}
 		if err := os.Remove(delFn); err != nil {
-			return err
+			return errors.Wrapf(err, "os.Remove error")
 		}
 	}
 	return nil
@@ -351,12 +351,12 @@ func InstallPackage(fn, prefix string, force bool) (*InstalledPackage, error) {
 
 	tmpDir, err := os.MkdirTemp("", "atxpkg")
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "os.Mkdir error")
 	}
 	defer os.RemoveAll(tmpDir)
 
 	if err := unzipTo(fn, tmpDir); err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "unzipTo error")
 	}
 
 	backupFn := filepath.Join(tmpDir, ".atxpkg_backup")
@@ -366,7 +366,7 @@ func InstallPackage(fn, prefix string, force bool) (*InstalledPackage, error) {
 
 	dirs, files, err := GetRecursiveListing(tmpDir)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "GetRecursiveListing error")
 	}
 	files = lo.Filter(files, func(x string, _ int) bool {
 		return !strings.HasPrefix(x, ".atxpkg_")
@@ -381,24 +381,24 @@ func InstallPackage(fn, prefix string, force bool) (*InstalledPackage, error) {
 	for _, d := range dirs {
 		log.Printf("I %s\n", d)
 		if err := os.MkdirAll(prefix+"/"+d, os.ModePerm); err != nil {
-			return nil, err
+			return nil, errors.Wrapf(err, "os.MkdirAll error")
 		}
 		srcInfo, err := os.Stat(tmpDir + "/" + d)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrapf(err, "os.Stat error")
 		}
 		if err := os.Chmod(prefix+"/"+d, srcInfo.Mode()); err != nil {
-			return nil, err
+			return nil, errors.Wrapf(err, "os.Chmod error")
 		}
 		if err := os.Chtimes(prefix+"/"+d, srcInfo.ModTime(), srcInfo.ModTime()); err != nil {
-			return nil, err
+			return nil, errors.Wrapf(err, "os.Chtimes error")
 		}
 	}
 	for _, f := range files {
 		log.Printf("I %s\n", f)
 		sum, err := GetMD5Sum(tmpDir + "/" + f)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrapf(err, "GetMD5Sum error")
 		}
 		ret.Md5sums[f] = sum
 
@@ -406,15 +406,15 @@ func InstallPackage(fn, prefix string, force bool) (*InstalledPackage, error) {
 		if FileExists(backupFn) && slices.Contains(ret.Backup, f) {
 			log.Printf("saving untracked %s as %s.atxpkg_save\n", backupFn, backupFn)
 			if err := os.Rename(backupFn, backupFn+".atxpkg_save"); err != nil {
-				return nil, err
+				return nil, errors.Wrapf(err, "os.Rename error")
 			}
 		}
 		targetFn := fmt.Sprintf("%s/%s", prefix, f)
 		if err := tryDelete(targetFn); err != nil {
-			return nil, err
+			return nil, errors.Wrapf(err, "tryDelete error")
 		}
 		if err := copyFile(tmpDir+"/"+f, targetFn); err != nil {
-			return nil, err
+			return nil, errors.Wrapf(err, "copyFile error")
 		}
 	}
 	return ret, nil
@@ -433,12 +433,12 @@ func UpdatePackage(fn, nameOld string, installedPackage InstalledPackage, prefix
 
 	tmpDir, err := os.MkdirTemp("", "atxpkg")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
 	if err := unzipTo(fn, tmpDir); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w", err)
 	}
 
 	backupFn := filepath.Join(tmpDir, ".atxpkg_backup")
@@ -448,7 +448,7 @@ func UpdatePackage(fn, nameOld string, installedPackage InstalledPackage, prefix
 
 	dirs, files, err := GetRecursiveListing(tmpDir)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w", err)
 	}
 	files = lo.Filter(files, func(x string, _ int) bool {
 		return !strings.HasPrefix(x, ".atxpkg_")
@@ -461,7 +461,7 @@ func UpdatePackage(fn, nameOld string, installedPackage InstalledPackage, prefix
 			continue
 		}
 		if err := os.Mkdir(targetDir, os.ModePerm); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%w", err)
 		}
 	}
 
@@ -476,7 +476,7 @@ func UpdatePackage(fn, nameOld string, installedPackage InstalledPackage, prefix
 	for _, f := range files {
 		sumNew, err := GetMD5Sum(filepath.Join(tmpDir, f))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%w", err)
 		}
 
 		ret.Md5sums[f] = sumNew
@@ -485,7 +485,7 @@ func UpdatePackage(fn, nameOld string, installedPackage InstalledPackage, prefix
 		if FileExists(targetFn) {
 			sumCurrent, err := GetMD5Sum(targetFn)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("%w", err)
 			}
 
 			if _, ok := installedPackage.Md5sums[f]; ok {
@@ -498,18 +498,18 @@ func UpdatePackage(fn, nameOld string, installedPackage InstalledPackage, prefix
 			if slices.Contains(ret.Backup, f) {
 				log.Printf("saving changed %s as %s.atxpkg_save\n", targetFn, targetFn)
 				if err := os.Rename(targetFn, targetFn+".atxpkg_save"); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("%w", err)
 				}
 			}
 
 			log.Printf("U %s\n", targetFn)
 			if err := tryDelete(targetFn); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("%w", err)
 			}
 		}
 
 		if err := copyFile(filepath.Join(tmpDir, f), targetFn); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%w", err)
 		}
 	}
 
@@ -521,21 +521,21 @@ func UpdatePackage(fn, nameOld string, installedPackage InstalledPackage, prefix
 			if FileExists(targetFn) {
 				sumCurrent, err := GetMD5Sum(targetFn)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("%w", err)
 				}
 
 				if !slices.Contains(lo.Keys(ret.Md5sums), fn) {
 					if !slices.Contains(filesToBackupOld, fn) {
 						log.Printf("DF %s\n", targetFn)
 						if err := tryDelete(targetFn); err != nil {
-							return nil, err
+							return nil, fmt.Errorf("%w", err)
 						}
 					}
 				} else {
 					if sumCurrent != md5sum {
 						log.Printf("saving changed %s as %s.atxpkg_save\n", targetFn, targetFn)
 						if err := os.Rename(targetFn, targetFn+".atxpkg_save"); err != nil {
-							return nil, err
+							return nil, fmt.Errorf("%w", err)
 						}
 					}
 				}
@@ -547,7 +547,7 @@ func UpdatePackage(fn, nameOld string, installedPackage InstalledPackage, prefix
 				if empty, err := isEmptyDir(dirName); empty && err == nil {
 					log.Printf("DD %s\n", dirName)
 					if err := tryDelete(dirName); err != nil {
-						return nil, err
+						return nil, fmt.Errorf("%w", err)
 					}
 					dirName = filepath.Dir(dirName)
 				}
