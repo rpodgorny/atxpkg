@@ -9,3 +9,6 @@ windows_console:
 
 wasm:
 	env GOOS=js GOARCH=wasm go build -a -v -trimpath -ldflags "-s -w" -o atxpkg.wasm
+
+clean:
+	rm -rf atxpkg atxpkg.exe atxpkg.wasm *.atxpkg.zip
