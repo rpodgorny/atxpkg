@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -89,13 +88,13 @@ func intMain() int {
 	if x, err := args.String("--prefix"); err == nil {
 		prefix = x
 	}
-	prefix = strings.TrimRight(prefix, "/")
-	prefix = lo.Must(filepath.Abs(prefix))
+	//prefix = lo.Must(filepath.Abs(prefix))
 
 	if !DirExists(prefix) {
-		slog.Error(fmt.Sprintf("Prefix directory does not exist: %v", prefix))
+		slog.Error(fmt.Sprintf("prefix directory does not exist: %v", prefix))
 		return 1
 	}
+	prefix = strings.TrimRight(prefix, "/")
 
 	repos, err := GetRepos(reposFn)
 	if err != nil {

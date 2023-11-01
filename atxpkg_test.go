@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"slices"
 	"testing"
 )
 
@@ -38,6 +40,31 @@ func TestYesNo(t *testing.T) {
 	}
 }
 
+func TestGetRecursiveListing(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.MkdirAll(tmpDir+"/some/directory", os.ModePerm); err != nil {
+		t.Fatalf(fmt.Sprintf("%+v", err))
+	}
+	if _, err := os.Create(tmpDir+"/some/file1"); err != nil {
+		t.Fatalf(fmt.Sprintf("%+v", err))
+	}
+	if _, err := os.Create(tmpDir+"/some/directory/file2"); err != nil {
+		t.Fatalf(fmt.Sprintf("%+v", err))
+	}
+	dirs, files, err := GetRecursiveListing(tmpDir)
+	if err != nil {
+		t.Fatalf(fmt.Sprintf("%+v", err))
+	}
+	if !slices.Equal(dirs, []string{"some", "some/directory"}) {
+		t.Errorf("wrong dirs: %v", dirs)
+	}
+	slices.Sort(files)
+	slices.Reverse(files)
+	if !slices.Equal(files, []string{"some/file1", "some/directory/file2"}) {
+		t.Errorf("wrong files: %v", files)
+	}
+}
+
 func TestGetAvailablePackages(t *testing.T) {
 	// TODO: make it work offline
 	packages := GetAvailablePackages(
@@ -56,6 +83,26 @@ func TestInstallPackage(t *testing.T) {
 	tmpDir := t.TempDir()
 	installedPackage, err := InstallPackage(
 		"./test_data/atx300-base-6.3-1.atxpkg.zip",
+		tmpDir,
+		false,
+	)
+	if err != nil {
+		t.Fatalf(fmt.Sprintf("%+v", err))
+	}
+	// TODO: not really much testing going on here
+	fmt.Println(installedPackage)
+}
+
+func TestUpdatePackage(t *testing.T) {
+	tmpDir := t.TempDir()
+	installedPackage, err := UpdatePackage(
+		"./test_data/atx300-base-6.3-1.atxpkg.zip",
+		"atx300-base",
+		InstalledPackage{
+			Version: "3.3",
+			Md5sums: map[string]string{},
+			Backup: []string{},
+		},
 		tmpDir,
 		false,
 	)

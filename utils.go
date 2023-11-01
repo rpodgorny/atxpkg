@@ -10,9 +10,11 @@ import (
 	"io"
 	"io/fs"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -230,17 +232,17 @@ func getRepoListingHttp(url string) ([]string, error) {
 
 func getRepoListingDir(path string) ([]string, error) {
 	ret := []string{}
-	err := filepath.Walk(path, func(path string, fi fs.FileInfo, err error) error {
+	err := fs.WalkDir(os.DirFS(path), ".", func(filePath string, de fs.DirEntry, err error) error {
 		if err != nil {
 			return fmt.Errorf("%w", err)
 		}
-		if fi.IsDir() {
+		if de.IsDir() {
 			return nil
 		}
-		if !strings.HasSuffix(path, ".atxpkg.zip") {
+		if !strings.HasSuffix(filePath, ".atxpkg.zip") {
 			return nil
 		}
-		ret = append(ret, filepath.ToSlash(path))
+		ret = append(ret, filepath.ToSlash(filePath))
 		return nil
 	})
 	if err != nil {
@@ -273,7 +275,7 @@ func DownloadPackageIfNeeded(url, cacheDir string) (string, error) {
 	if !isUrl(url) {
 		return url, nil
 	}
-	fn := filepath.Join(cacheDir, GetPackageFn(url))
+	fn := cacheDir+"/"+GetPackageFn(url)
 	if FileExists(fn) {
 		log.Printf("using cached %s\n", fn)
 		return fn, nil
@@ -340,7 +342,8 @@ func tryDelete(fn string) error {
 			return fmt.Errorf("%w", err)
 		}
 		if err := os.Remove(delFn); err != nil {
-			return fmt.Errorf("%w", err)
+			slog.Warn("failed to remove file", "fn", delFn, "err", err)
+			//return fmt.Errorf("%w", err)
 		}
 	}
 	return nil
@@ -361,6 +364,7 @@ func InstallPackage(fn, prefix string, force bool) (*InstalledPackage, error) {
 		return nil, fmt.Errorf("%w", err)
 	}
 	defer os.RemoveAll(tmpDir)
+	slog.Debug("", "tmpDir", tmpDir)
 
 	if err := unzipTo(fn, tmpDir); err != nil {
 		return nil, fmt.Errorf("%w", err)
@@ -386,30 +390,30 @@ func InstallPackage(fn, prefix string, force bool) (*InstalledPackage, error) {
 		}
 	}
 	for _, d := range dirs {
+		targetDir := prefix+"/"+d
 		log.Printf("I %s\n", d)
-		if err := os.MkdirAll(prefix+"/"+d, os.ModePerm); err != nil {
+		if err := os.MkdirAll(targetDir, os.ModePerm); err != nil {
 			return nil, fmt.Errorf("%w", err)
 		}
 		srcInfo, err := os.Stat(tmpDir+"/"+d)
 		if err != nil {
 			return nil, fmt.Errorf("%w", err)
 		}
-		if err := os.Chmod(prefix+"/"+d, srcInfo.Mode()); err != nil {
+		if err := os.Chmod(targetDir, srcInfo.Mode()); err != nil {
 			return nil, fmt.Errorf("%w", err)
 		}
-		if err := os.Chtimes(prefix+"/"+d, srcInfo.ModTime(), srcInfo.ModTime()); err != nil {
+		if err := os.Chtimes(targetDir, srcInfo.ModTime(), srcInfo.ModTime()); err != nil {
 			return nil, fmt.Errorf("%w", err)
 		}
 	}
 	for _, f := range files {
-		log.Printf("I %s\n", f)
+		targetFn := prefix+"/"+f
+		log.Printf("I %s\n", targetFn)
 		sum, err := GetMD5Sum(tmpDir+"/"+f)
 		if err != nil {
 			return nil, fmt.Errorf("%w", err)
 		}
 		ret.Md5sums[f] = sum
-
-		targetFn := fmt.Sprintf("%s/%s", prefix, f)
 		if FileExists(targetFn) && slices.Contains(ret.Backup, f) {
 			log.Printf("saving untracked %s as %s.atxpkg_save\n", targetFn, targetFn)
 			if err := os.Rename(targetFn, targetFn+".atxpkg_save"); err != nil {
@@ -469,7 +473,7 @@ func UpdatePackage(fn, nameOld string, installedPackage InstalledPackage, prefix
 		}
 	}
 	for _, d := range dirs {
-		targetDir := filepath.Join(prefix, d)
+		targetDir := prefix+"/"+d
 		log.Printf("UD %s\n", targetDir)
 		if !DirExists(targetDir) {
 			if err := os.Mkdir(targetDir, os.ModePerm); err != nil {
@@ -480,13 +484,13 @@ func UpdatePackage(fn, nameOld string, installedPackage InstalledPackage, prefix
 	}
 
 	for _, f := range files {
-		sumNew, err := GetMD5Sum(filepath.Join(tmpDir, f))
+		sumNew, err := GetMD5Sum(tmpDir+"/"+f)
 		if err != nil {
 			return nil, fmt.Errorf("%w", err)
 		}
 		ret.Md5sums[f] = sumNew
 
-		targetFn := filepath.Join(prefix, f)
+		targetFn := prefix+"/"+f
 		if FileExists(targetFn) && (slices.Contains(ret.Backup, f) || slices.Contains(installedPackage.Backup, f)) {
 			if sumOriginal, ok := installedPackage.Md5sums[f]; ok {
 				sumCurrent, err := GetMD5Sum(targetFn)
@@ -506,7 +510,7 @@ func UpdatePackage(fn, nameOld string, installedPackage InstalledPackage, prefix
 		if err := tryDelete(targetFn); err != nil {
 			return nil, fmt.Errorf("%w", err)
 		}
-		if err := copyFile(filepath.Join(tmpDir, f), targetFn); err != nil {
+		if err := copyFile(tmpDir+"/"+f, targetFn); err != nil {
 			return nil, fmt.Errorf("%w", err)
 		}
 	}
@@ -515,7 +519,7 @@ func UpdatePackage(fn, nameOld string, installedPackage InstalledPackage, prefix
 	filesToBackupOld := installedPackage.Backup
 	for fn, md5sum := range installedPackage.Md5sums {
 		if _, ok := ret.Md5sums[fn]; !ok {
-			targetFn := filepath.Join(prefix, fn)
+			targetFn := prefix+"/"+fn
 			if FileExists(targetFn) {
 				sumCurrent, err := GetMD5Sum(targetFn)
 				if err != nil {
@@ -538,7 +542,7 @@ func UpdatePackage(fn, nameOld string, installedPackage InstalledPackage, prefix
 					}
 				}
 
-				dirName := filepath.Dir(targetFn)
+				dirName := path.Dir(targetFn)
 				if dirName == prefix {
 					continue
 				}
@@ -547,7 +551,7 @@ func UpdatePackage(fn, nameOld string, installedPackage InstalledPackage, prefix
 					if err := tryDelete(dirName); err != nil {
 						return nil, fmt.Errorf("%w", err)
 					}
-					dirName = filepath.Dir(dirName)
+					dirName = path.Dir(dirName)
 				}
 			}
 		}
@@ -562,7 +566,7 @@ func RemovePackage(packageName string, installedPackages map[string]InstalledPac
 	packageInfo := installedPackages[packageName]
 
 	for fn, md5sum := range packageInfo.Md5sums {
-		targetFn := filepath.Join(prefix, fn)
+		targetFn := prefix+"/"+fn
 		if !FileExists(targetFn) {
 			log.Printf("%s does not exist!\n", targetFn)
 			continue
@@ -591,7 +595,7 @@ func RemovePackage(packageName string, installedPackages map[string]InstalledPac
 			}
 		}
 
-		dirName := filepath.Dir(targetFn)
+		dirName := path.Dir(targetFn)
 		if dirName == prefix {
 			continue
 		}
@@ -611,7 +615,7 @@ func MergeConfigPackage(packageName string, installedPackages map[string]Install
 
 	for _, fn := range filesToBackupOld {
 		for _, suffix := range []string{".atxpkg_backup", ".atxpkg_new", ".atxpkg_save"} {
-			fnFull := filepath.Join(prefix, fn)
+			fnFull := prefix+"/"+fn
 			fnFromFull := fnFull + suffix
 
 			if _, err := os.Stat(fnFromFull); err == nil {
@@ -689,18 +693,19 @@ func GetMD5Sum(fn string) (string, error) {
 
 func GetRecursiveListing(path string) (dirs []string, files []string, _ error) {
 	var retDirs, retFiles []string
-	err := filepath.Walk(path, func(filePath string, fi fs.FileInfo, err error) error {
-		if err != nil {
+	err := fs.WalkDir(os.DirFS(path), ".", func(filePath string, de fs.DirEntry, err error) error {
+if err != nil {
 			return fmt.Errorf("%w", err)
 		}
-		relPath, err := filepath.Rel(path, filePath)
+		/*relPath, err := filepath.Rel(path, filePath)
 		if err != nil {
 			return fmt.Errorf("%w", err)
-		}
+		}*/
+		relPath := strings.TrimPrefix(filePath, path)
 		if relPath == "." {
 			return nil
 		}
-		if fi.IsDir() {
+		if de.IsDir() {
 			retDirs = append(retDirs, filepath.ToSlash(relPath))
 		} else {
 			retFiles = append(retFiles, filepath.ToSlash(relPath))
@@ -769,7 +774,7 @@ func CleanCache(cacheDir string) error {
 		return fmt.Errorf("%w", err)
 	}
 	for _, file := range files {
-		filePath := filepath.Join(cacheDir, file.Name())
+		filePath := cacheDir+"/"+file.Name()
 		if err := os.Remove(filePath); err != nil {
 			return fmt.Errorf("%w", err)
 		}
@@ -865,7 +870,7 @@ func unzipTo(fnZip string, path string) error {
 		}
 		defer rc.Close()
 
-		filePath := filepath.Join(path, file.Name)
+		filePath := path+"/"+file.Name
 		fmt.Println("UNZIP", file.Name)
 		if file.FileInfo().IsDir() {
 			if err := os.Mkdir(filePath, os.ModePerm); err != nil {
@@ -1148,7 +1153,7 @@ func CheckPackages(
 	errCount := 0
 	for _, packageName := range packages {
 		for fn := range installedPackages[packageName].Md5sums {
-			filePath := filepath.Join(prefix, fn)
+			filePath := prefix+"/"+fn
 			if _, err := os.Stat(filePath); os.IsNotExist(err) {
 				fmt.Printf("%s: does not exist: %s\n", packageName, filePath)
 				errCount++
