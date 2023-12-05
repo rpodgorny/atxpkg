@@ -551,7 +551,6 @@ func UpdatePackage(fn, nameOld string, installedPackage InstalledPackage, prefix
 					if err := tryDelete(dirName); err != nil {
 						return nil, fmt.Errorf("%w", err)
 					}
-					dirName = path.Dir(dirName)
 				}
 			}
 		}
