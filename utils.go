@@ -35,8 +35,7 @@ func SplitVer(ver string) []int {
 	parts := regex.Split(ver, -1)
 	var result []int
 	for _, part := range parts {
-		num, err := strconv.Atoi(part)
-		if err == nil {
+		if num, err := strconv.Atoi(part); err == nil {
 			result = append(result, num)
 		}
 	}
