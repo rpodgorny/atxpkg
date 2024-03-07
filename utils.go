@@ -1017,8 +1017,10 @@ func UpdatePackages(
 		} else {
 			pu.versionOld = installedPackage.Version
 		}
-		if _, ok := installedPackages[pu.nameNew]; !ok {
-			return nil, errors.Errorf("package %s already installed", pu.nameNew)
+		if pu.nameOld != pu.nameNew {
+			if _, ok := installedPackages[pu.nameNew]; ok {
+				return nil, errors.Errorf("package %s already installed", pu.nameNew)
+			}
 		}
 		packageUpdates = append(packageUpdates, pu)
 	}
