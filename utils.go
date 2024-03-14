@@ -497,11 +497,13 @@ func UpdatePackage(fn, nameOld string, installedPackage InstalledPackage, prefix
 					return nil, fmt.Errorf("%w", err)
 				}
 				if sumOriginal == sumCurrent || sumCurrent == sumNew {
-					continue
-				}
-				log.Printf("saving changed %s as %s.atxpkg_save\n", targetFn, targetFn)
-				if err := os.Rename(targetFn, targetFn+".atxpkg_save"); err != nil {
-					return nil, fmt.Errorf("%w", err)
+					//continue
+				} else {
+					log.Printf("sum for file %s changed, installing new version as %s.atxpkg_new\n", targetFn, targetFn)
+					//if err := os.Rename(targetFn, targetFn+".atxpkg_save"); err != nil {
+					//	return nil, fmt.Errorf("%w", err)
+					//}
+					targetFn = targetFn + ".atxpkg_new"
 				}
 			}
 		}
