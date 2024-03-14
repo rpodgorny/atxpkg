@@ -54,8 +54,6 @@ func intMain() int {
 
 	slog.Info(fmt.Sprintf("starting atxpkg v%s", VERSION))
 
-	//slog.Debug("args", "args", args)
-
 	force := lo.Must(args.Bool("--force"))
 	yes := lo.Must(args.Bool("--yes"))
 	no := lo.Must(args.Bool("--no"))
@@ -89,8 +87,10 @@ func intMain() int {
 	if x, err := args.String("--prefix"); err == nil {
 		prefix = x
 	}
-	//prefix = lo.Must(filepath.Abs(prefix))
-
+	if !strings.HasPrefix(prefix, "/") {
+		slog.Error(fmt.Sprintf("prefix must be absolute path: %v", prefix))
+		return 1
+	}
 	if !fsutil.IsDir(prefix) {
 		slog.Error(fmt.Sprintf("prefix directory does not exist: %v", prefix))
 		return 1
