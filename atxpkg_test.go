@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/gookit/goutil/fsutil"
@@ -15,12 +14,9 @@ func TestInstallPackage(t *testing.T) {
 		tmpDir,
 		false,
 	))
-
-	// TODO: not really much testing going on here
-	fmt.Println(installedPackage)
-
 	lo.Must0(installedPackage.Version == "6.3-1")
 	lo.Must0(fsutil.FileExists(tmpDir + "/atx300/memsh.mem"))
+	// TODO: add more tests
 }
 
 func TestUpdatePackage(t *testing.T) {
@@ -36,12 +32,9 @@ func TestUpdatePackage(t *testing.T) {
 		tmpDir,
 		false,
 	))
-
-	// TODO: not really much testing going on here
-	fmt.Println(installedPackage)
-
 	lo.Must0(installedPackage.Version == "6.3-1")
 	lo.Must0(fsutil.FileExists(tmpDir + "/atx300/memsh.mem"))
+	// TODO: add more tests
 }
 
 func TestUpdatePackageWithBackup(t *testing.T) {
@@ -51,6 +44,7 @@ func TestUpdatePackageWithBackup(t *testing.T) {
 		tmpDir,
 		false,
 	))
+	lo.Must0(installedPackage.Version == "6.3-1")
 	lo.Must0(fsutil.WriteFile(tmpDir+"/atx300/set/base/base.ini", []byte("test"), 0644)) // protected file
 	lo.Must0(fsutil.WriteFile(tmpDir+"/atx300/memsh.mem", []byte("test"), 0644))         // unprotected file
 	installedPackage = lo.Must(UpdatePackage(
@@ -60,9 +54,10 @@ func TestUpdatePackageWithBackup(t *testing.T) {
 		tmpDir,
 		false,
 	))
-
+	lo.Must0(installedPackage.Version == "6.3-1")
 	lo.Must0(fsutil.FileExists(tmpDir + "/atx300/set/base/base.ini"))
 	lo.Must0(fsutil.FileExists(tmpDir + "/atx300/set/base/base.ini.atxpkg_new"))
 	lo.Must0(fsutil.FileExists(tmpDir + "/atx300/memsh.mem"))
 	lo.Must0(!fsutil.FileExists(tmpDir + "/atx300/memsh.mem.atxpkg_new"))
+	// TODO: add more tests
 }

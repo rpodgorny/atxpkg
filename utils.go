@@ -801,12 +801,6 @@ func isValidPackageFn(fn string) bool {
 	return re.MatchString(fn)
 }
 
-// TODO: unused?
-func hasVersion(pkgSpec string) bool {
-	re := regexp.MustCompile(`[\w\-\.]+-[\d.]+-\d+`)
-	return re.MatchString(pkgSpec)
-}
-
 func unzipTo(fnZip string, path string) error {
 	r, err := zip.OpenReader(fnZip)
 	if err != nil {
