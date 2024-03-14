@@ -106,7 +106,7 @@ func intMain() int {
 
 	if !fsutil.FileExists(dbFn) {
 		slog.Info(fmt.Sprintf("%s not found, creating empty one", dbFn))
-		err := os.WriteFile(dbFn, []byte("{}"), 0644)
+		err := os.WriteFile(dbFn, []byte("{}"), 0o644)
 		if err != nil {
 			slog.Error("Error creating %s: %v", dbFn, err)
 			return 1

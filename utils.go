@@ -248,7 +248,7 @@ func DownloadPackageIfNeeded(url, cacheDir string) (string, error) {
 		}
 	}
 
-	f, err := os.OpenFile(fn+"_", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+	f, err := os.OpenFile(fn+"_", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644)
 	if err != nil {
 		return "", fmt.Errorf("%w", err)
 	}
