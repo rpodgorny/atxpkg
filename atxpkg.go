@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/docopt/docopt-go"
+	"github.com/gookit/goutil/fsutil"
 	"github.com/samber/lo"
 )
 
@@ -90,7 +91,7 @@ func intMain() int {
 	}
 	//prefix = lo.Must(filepath.Abs(prefix))
 
-	if !DirExists(prefix) {
+	if !fsutil.IsDir(prefix) {
 		slog.Error(fmt.Sprintf("prefix directory does not exist: %v", prefix))
 		return 1
 	}
@@ -103,7 +104,7 @@ func intMain() int {
 	}
 	repos = append(repos, cacheDir)
 
-	if !FileExists(dbFn) {
+	if !fsutil.FileExists(dbFn) {
 		slog.Info(fmt.Sprintf("%s not found, creating empty one", dbFn))
 		err := os.WriteFile(dbFn, []byte("{}"), 0644)
 		if err != nil {
@@ -112,7 +113,7 @@ func intMain() int {
 		}
 	}
 
-	if !DirExists(cacheDir) {
+	if !fsutil.IsDir(cacheDir) {
 		slog.Info(fmt.Sprintf("%s not found, creating empty one", cacheDir))
 		err := os.MkdirAll(cacheDir, os.ModePerm)
 		if err != nil {

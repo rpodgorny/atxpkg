@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gookit/goutil/fsutil"
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
 	"github.com/schollz/progressbar/v3"
@@ -42,61 +43,16 @@ func SplitVer(ver string) []int {
 	return result
 }
 
-func CompareSlices(slice1, slice2 []int) int {
-	minLen := len(slice1)
-	if len(slice2) < minLen {
-		minLen = len(slice2)
-	}
-	for i := 0; i < minLen; i++ {
-		if slice1[i] < slice2[i] {
-			return -1
-		} else if slice1[i] > slice2[i] {
-			return 1
-		}
-	}
-	if len(slice1) < len(slice2) {
-		return -1
-	} else if len(slice1) > len(slice2) {
-		return 1
-	}
-	return 0
-}
-
 func CompareVersions(v1, v2 string) int {
-	return CompareSlices(SplitVer(v1), SplitVer(v2))
+	return slices.Compare(SplitVer(v1), SplitVer(v2))
 }
 
 func GetUnixTime() float64 {
 	return float64(time.Now().UnixNano()) / 1e9
 }
 
-// TODO: find some function for this in "lo"
-func UnwrapOrEmpty[T any](res T, err error) T {
-	var empty T
-	if err != nil {
-		return empty
-	}
-	return res
-}
-
 func isUrl(s string) bool {
 	return strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://")
-}
-
-func FileExists(fn string) bool {
-	fi, err := os.Stat(fn)
-	if os.IsNotExist(err) {
-		return false
-	}
-	return !fi.IsDir()
-}
-
-func DirExists(path string) bool {
-	fi, err := os.Stat(path)
-	if os.IsNotExist(err) {
-		return false
-	}
-	return fi.IsDir()
 }
 
 func isEmptyDir(path string) (bool, error) {
@@ -275,13 +231,13 @@ func DownloadPackageIfNeeded(url, cacheDir string) (string, error) {
 		return url, nil
 	}
 	fn := cacheDir + "/" + GetPackageFn(url)
-	if FileExists(fn) {
+	if fsutil.FileExists(fn) {
 		log.Printf("using cached %s\n", fn)
 		return fn, nil
 	}
 	log.Printf("downloading %s to %s\n", url, fn)
 	resumeFrom := 0
-	if FileExists(fn + "_") {
+	if fsutil.FileExists(fn + "_") {
 		if resp, err := http.Head(url); err == nil {
 			defer resp.Body.Close()
 			if resp.StatusCode == http.StatusOK && resp.Header.Get("Accept-Ranges") == "bytes" {
@@ -331,7 +287,7 @@ func DownloadPackageIfNeeded(url, cacheDir string) (string, error) {
 func tryDelete(fn string) error {
 	if _, err := os.Stat(fn); !os.IsNotExist(err) {
 		delFn := fn + ".atxpkg_delete"
-		for FileExists(delFn) {
+		for fsutil.FileExists(delFn) {
 			if err := os.Remove(delFn); err != nil {
 				break
 			}
@@ -383,7 +339,7 @@ func InstallPackage(fn, prefix string, force bool) (*InstalledPackage, error) {
 	if !force {
 		for _, f := range files {
 			targetFn := prefix + "/" + f
-			if FileExists(targetFn) {
+			if fsutil.FileExists(targetFn) {
 				return nil, errors.Errorf("file exists: %s", targetFn)
 			}
 		}
@@ -413,7 +369,7 @@ func InstallPackage(fn, prefix string, force bool) (*InstalledPackage, error) {
 			return nil, fmt.Errorf("%w", err)
 		}
 		ret.Md5sums[f] = sum
-		if FileExists(targetFn) && slices.Contains(ret.Backup, f) {
+		if fsutil.FileExists(targetFn) && slices.Contains(ret.Backup, f) {
 			log.Printf("saving untracked %s as %s.atxpkg_save\n", targetFn, targetFn)
 			if err := os.Rename(targetFn, targetFn+".atxpkg_save"); err != nil {
 				return nil, fmt.Errorf("%w", err)
@@ -464,7 +420,7 @@ func UpdatePackage(fn, nameOld string, installedPackage InstalledPackage, prefix
 	if !force {
 		for _, f := range files {
 			targetFn := prefix + "/" + f
-			if FileExists(targetFn) {
+			if fsutil.FileExists(targetFn) {
 				if _, ok := installedPackage.Md5sums[f]; !ok {
 					return nil, fmt.Errorf("%s already exists but is not part of original package", f)
 				}
@@ -474,7 +430,7 @@ func UpdatePackage(fn, nameOld string, installedPackage InstalledPackage, prefix
 	for _, d := range dirs {
 		targetDir := prefix + "/" + d
 		log.Printf("UD %s\n", targetDir)
-		if !DirExists(targetDir) {
+		if !fsutil.IsDir(targetDir) {
 			if err := os.Mkdir(targetDir, os.ModePerm); err != nil {
 				return nil, fmt.Errorf("%w", err)
 			}
@@ -490,7 +446,7 @@ func UpdatePackage(fn, nameOld string, installedPackage InstalledPackage, prefix
 		ret.Md5sums[f] = sumNew
 
 		targetFn := prefix + "/" + f
-		if FileExists(targetFn) && (slices.Contains(ret.Backup, f) || slices.Contains(installedPackage.Backup, f)) {
+		if fsutil.FileExists(targetFn) && (slices.Contains(ret.Backup, f) || slices.Contains(installedPackage.Backup, f)) {
 			if sumOriginal, ok := installedPackage.Md5sums[f]; ok {
 				sumCurrent, err := GetMD5Sum(targetFn)
 				if err != nil {
@@ -521,7 +477,7 @@ func UpdatePackage(fn, nameOld string, installedPackage InstalledPackage, prefix
 	for fn, md5sum := range installedPackage.Md5sums {
 		if _, ok := ret.Md5sums[fn]; !ok {
 			targetFn := prefix + "/" + fn
-			if FileExists(targetFn) {
+			if fsutil.FileExists(targetFn) {
 				sumCurrent, err := GetMD5Sum(targetFn)
 				if err != nil {
 					return nil, fmt.Errorf("%w", err)
@@ -567,7 +523,7 @@ func RemovePackage(packageName string, installedPackages map[string]InstalledPac
 
 	for fn, md5sum := range packageInfo.Md5sums {
 		targetFn := prefix + "/" + fn
-		if !FileExists(targetFn) {
+		if !fsutil.FileExists(targetFn) {
 			log.Printf("%s does not exist!\n", targetFn)
 			continue
 		}
