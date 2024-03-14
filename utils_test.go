@@ -45,10 +45,10 @@ func TestGetRecursiveListing(t *testing.T) {
 	if err := os.MkdirAll(tmpDir+"/some/directory", os.ModePerm); err != nil {
 		t.Fatalf(fmt.Sprintf("%+v", err))
 	}
-	if _, err := os.Create(tmpDir+"/some/file1"); err != nil {
+	if _, err := os.Create(tmpDir + "/some/file1"); err != nil {
 		t.Fatalf(fmt.Sprintf("%+v", err))
 	}
-	if _, err := os.Create(tmpDir+"/some/directory/file2"); err != nil {
+	if _, err := os.Create(tmpDir + "/some/directory/file2"); err != nil {
 		t.Fatalf(fmt.Sprintf("%+v", err))
 	}
 	dirs, files, err := GetRecursiveListing(tmpDir)
@@ -78,4 +78,3 @@ func TestGetAvailablePackages(t *testing.T) {
 	// TODO: this does not test anything
 	fmt.Printf("%v", packages)
 }
-
