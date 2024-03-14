@@ -770,6 +770,9 @@ func GetMaxVersionURL(urls []string) string {
 
 func GetPackageFn(url string) string {
 	parts := strings.Split(url, "/")
+	if len(parts) == 0 {
+		return ""
+	}
 	return parts[len(parts)-1]
 }
 
