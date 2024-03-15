@@ -7,6 +7,9 @@ release:
 windows_console:
 	env GOOS=windows GOARCH=amd64 go build -a -v -trimpath -ldflags "-s -w"
 
+test:
+	go run gotest.tools/gotestsum@latest --format=dots
+
 wasm:
 	env GOOS=js GOARCH=wasm go build -a -v -trimpath -ldflags "-s -w" -o atxpkg.wasm
 
