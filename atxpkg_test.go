@@ -17,7 +17,7 @@ func TestInstallPackage(t *testing.T) {
 	))
 	assert.Equal(t, "6.3-1", installedPackage.Version)
 	assert.FileExists(t, tmpDir+"/atx300/memsh.mem")
-	// TODO: add more tests
+	assert.NoFileExists(t, tmpDir+"/.atxpkg_backup")
 }
 
 func TestUpdatePackage(t *testing.T) {
@@ -35,7 +35,7 @@ func TestUpdatePackage(t *testing.T) {
 	))
 	assert.Equal(t, "6.3-1", installedPackage.Version)
 	assert.FileExists(t, tmpDir+"/atx300/memsh.mem")
-	// TODO: add more tests
+	assert.NoFileExists(t, tmpDir+"/.atxpkg_backup")
 }
 
 func TestUpdatePackageWithConflict(t *testing.T) {
