@@ -87,10 +87,10 @@ func intMain() int {
 	if x, err := args.String("--prefix"); err == nil {
 		prefix = x
 	}
-	if (runtime.GOOS == "windows" && !strings.HasPrefix(prefix, "c:")) || (!strings.HasPrefix(prefix, "/")) {
+	/*if (runtime.GOOS == "windows" && !strings.HasPrefix(prefix, "c:")) || (!strings.HasPrefix(prefix, "/")) {
 		slog.Error(fmt.Sprintf("prefix must be absolute path: %v", prefix))
 		return 1
-	}
+	}*/
 	if !fsutil.IsDir(prefix) {
 		slog.Error(fmt.Sprintf("prefix directory does not exist: %v", prefix))
 		return 1
