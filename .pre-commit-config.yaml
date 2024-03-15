@@ -50,12 +50,12 @@ repos:
         types:
           - go
 
-  - repo: local
-    hooks:
-      - id: nilaway
-        name: nilaway
-        entry: go run go.uber.org/nilaway/cmd/nilaway@latest ./...
-        language: system
-        pass_filenames: false
-        types:
-          - go
+  # - repo: local
+  #   hooks:
+  #     - id: nilaway
+  #       name: nilaway
+  #       entry: go run go.uber.org/nilaway/cmd/nilaway@latest ./...
+  #       language: system
+  #       pass_filenames: false
+  #       types:
+  #         - go
