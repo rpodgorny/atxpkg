@@ -452,7 +452,7 @@ func UpdatePackage(fn, nameOld string, installedPackage InstalledPackage, prefix
 				if err != nil {
 					return nil, fmt.Errorf("%w", err)
 				}
-				if sumOriginal != sumCurrent && sumCurrent != sumNew {
+				if sumOriginal != sumNew && sumOriginal != sumCurrent && sumCurrent != sumNew {
 					log.Printf("sum for file %s changed, installing new version as %s.atxpkg_new\n", targetFn, targetFn)
 					targetFn = targetFn + ".atxpkg_new"
 				}
