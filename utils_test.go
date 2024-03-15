@@ -5,6 +5,8 @@ import (
 	"os"
 	"slices"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestYesNo(t *testing.T) {
@@ -33,36 +35,25 @@ func TestYesNo(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ans := YesNo(tt.msg, tt.def)
-			if ans != tt.want {
-				t.Errorf("got %v, want %v", ans, tt.want)
-			}
+			assert.Equal(t, tt.want, ans)
 		})
 	}
 }
 
 func TestGetRecursiveListing(t *testing.T) {
 	tmpDir := t.TempDir()
-	if err := os.MkdirAll(tmpDir+"/some/directory", os.ModePerm); err != nil {
-		t.Fatalf(fmt.Sprintf("%+v", err))
-	}
-	if _, err := os.Create(tmpDir + "/some/file1"); err != nil {
-		t.Fatalf(fmt.Sprintf("%+v", err))
-	}
-	if _, err := os.Create(tmpDir + "/some/directory/file2"); err != nil {
-		t.Fatalf(fmt.Sprintf("%+v", err))
-	}
+	err := os.MkdirAll(tmpDir+"/some/directory", os.ModePerm)
+	assert.NoError(t, err)
+	_, err = os.Create(tmpDir + "/some/file1")
+	assert.NoError(t, err)
+	_, err = os.Create(tmpDir + "/some/directory/file2")
+	assert.NoError(t, err)
 	dirs, files, err := GetRecursiveListing(tmpDir)
-	if err != nil {
-		t.Fatalf(fmt.Sprintf("%+v", err))
-	}
-	if !slices.Equal(dirs, []string{"some", "some/directory"}) {
-		t.Errorf("wrong dirs: %v", dirs)
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"some", "some/directory"}, dirs)
 	slices.Sort(files)
 	slices.Reverse(files)
-	if !slices.Equal(files, []string{"some/file1", "some/directory/file2"}) {
-		t.Errorf("wrong files: %v", files)
-	}
+	assert.Equal(t, []string{"some/file1", "some/directory/file2"}, files)
 }
 
 func TestGetAvailablePackages(t *testing.T) {
