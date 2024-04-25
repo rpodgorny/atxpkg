@@ -66,7 +66,7 @@ func intMain() int {
 		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
 
-	var dbFn, reposFn, cacheDir string
+	var dbFn, reposFn, cacheDir, tmpDirPrefix string
 	var repos []string
 	var prefix string
 
@@ -76,12 +76,14 @@ func intMain() int {
 		reposFn = "c:/atxpkg/repos.txt"
 		prefix = "c:"
 		cacheDir = "c:/atxpkg/cache"
+		tmpDirPrefix = "c:/atxpkg/tmp"
 	} else {
 		slog.Info("detected non-win32")
 		dbFn = "/tmp/atxpkg/installed.json"
 		reposFn = "/tmp/atxpkg/repos.txt"
 		prefix = "/"
 		cacheDir = "/tmp/atxpkg/cache"
+		tmpDirPrefix = "/tmp/atxpkg/tmp"
 	}
 
 	if x, err := args.String("--prefix"); err == nil {
@@ -122,6 +124,15 @@ func intMain() int {
 		}
 	}
 
+	if !fsutil.IsDir(tmpDirPrefix) {
+		slog.Info(fmt.Sprintf("%s not found, creating empty one", tmpDirPrefix))
+		err := os.MkdirAll(tmpDirPrefix, os.ModePerm)
+		if err != nil {
+			slog.Error("Error creating %s: %v", tmpDirPrefix, err)
+			return 1
+		}
+	}
+
 	installedPackages, err := GetInstalledPackages(dbFn)
 	if err != nil {
 		slog.Error(fmt.Sprintf("%+v", err))
@@ -146,6 +157,7 @@ func intMain() int {
 			no,
 			downloadOnly,
 			cacheDir,
+			tmpDirPrefix,
 		)
 		if err != nil {
 			slog.Error(fmt.Sprintf("%+v", err))
@@ -178,6 +190,7 @@ func intMain() int {
 			no,
 			downloadOnly,
 			cacheDir,
+			tmpDirPrefix,
 		)
 		if err != nil {
 			slog.Error(fmt.Sprintf("%+v", err))

@@ -304,7 +304,7 @@ func tryDelete(fn string) error {
 	return nil
 }
 
-func InstallPackage(fn, prefix string, force bool) (*InstalledPackage, error) {
+func InstallPackage(fn, prefix string, force bool, tmpDirPrefix string) (*InstalledPackage, error) {
 	name, versionNew := SplitPackageNameVersion(GetPackageFn(fn))
 	log.Printf("installing %s-%s\n", name, versionNew)
 
@@ -314,7 +314,7 @@ func InstallPackage(fn, prefix string, force bool) (*InstalledPackage, error) {
 		Backup:  nil,
 	}
 
-	tmpDir, err := os.MkdirTemp("", "atxpkg")
+	tmpDir, err := os.MkdirTemp(tmpDirPrefix, "")
 	if err != nil {
 		return nil, fmt.Errorf("%w", err)
 	}
@@ -385,7 +385,7 @@ func InstallPackage(fn, prefix string, force bool) (*InstalledPackage, error) {
 	return ret, nil
 }
 
-func UpdatePackage(fn, nameOld string, installedPackage InstalledPackage, prefix string, force bool) (*InstalledPackage, error) {
+func UpdatePackage(fn, nameOld string, installedPackage InstalledPackage, prefix string, force bool, tmpDirPrefix string) (*InstalledPackage, error) {
 	versionOld := installedPackage.Version
 	name, versionNew := SplitPackageNameVersion(GetPackageFn(fn))
 	log.Printf("updating %s-%s -> %s-%s\n", nameOld, versionOld, name, versionNew)
@@ -396,7 +396,7 @@ func UpdatePackage(fn, nameOld string, installedPackage InstalledPackage, prefix
 		Backup:  nil,
 	}
 
-	tmpDir, err := os.MkdirTemp("", "atxpkg")
+	tmpDir, err := os.MkdirTemp(tmpDirPrefix, "")
 	if err != nil {
 		return nil, fmt.Errorf("%w", err)
 	}
@@ -851,6 +851,7 @@ func InstallPackages(
 	no bool,
 	downloadOnly bool,
 	cacheDir string,
+	tmpDirPrefix string,
 ) (map[string]InstalledPackage, error) {
 	availablePackages := GetAvailablePackages(repos, offline)
 
@@ -902,7 +903,7 @@ func InstallPackages(
 	}
 	for _, localFn := range localFnsToInstall {
 		packageName, packageVersion := SplitPackageNameVersion(GetPackageFn(localFn))
-		packageInfo, err := InstallPackage(localFn, prefix, force)
+		packageInfo, err := InstallPackage(localFn, prefix, force, tmpDirPrefix)
 		if err != nil {
 			return nil, fmt.Errorf("%w", err)
 		}
@@ -924,6 +925,7 @@ func UpdatePackages(
 	no bool,
 	downloadOnly bool,
 	cacheDir string,
+	tmpDirPrefix string,
 ) (map[string]InstalledPackage, error) {
 	type packageUpdate struct {
 		nameOld    string
@@ -1033,7 +1035,7 @@ func UpdatePackages(
 	}
 
 	for _, pu := range packageUpdates {
-		packageInfo, err := UpdatePackage(pu.localFn, pu.nameOld, installedPackages[pu.nameOld], prefix, force)
+		packageInfo, err := UpdatePackage(pu.localFn, pu.nameOld, installedPackages[pu.nameOld], prefix, force, tmpDirPrefix)
 		if err != nil {
 			return nil, fmt.Errorf("%w", err)
 		}
