@@ -15,3 +15,7 @@ wasm:
 
 clean:
 	rm -rf atxpkg atxpkg.exe atxpkg.wasm *.atxpkg.zip
+
+updeps:
+	go get -u ./...
+	go mod tidy
