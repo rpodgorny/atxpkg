@@ -7,7 +7,7 @@ export pkgrel=1
 
 git submodule update --recursive --init
 
-podman run --rm -it -v go_cache:/go/pkg/mod -v .:/xxx docker.io/golang:1.22.1 /bin/sh -c "cd /xxx; make windows_console"
+podman run --rm -it -v go_cache:/go/pkg/mod -v .:/xxx docker.io/golang:1.21.11 /bin/sh -c "cd /xxx; make windows_console"
 
 rm -rf __pkg
 mkdir __pkg
