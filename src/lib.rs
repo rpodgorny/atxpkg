@@ -1,0 +1,1517 @@
+use itertools::Itertools;
+use md5::{Digest, Md5};
+use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+use std::fs::File;
+use std::io::{BufRead, IsTerminal, Read, Write};
+use std::path::Path;
+use std::time::{Duration, UNIX_EPOCH};
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct InstalledPackage {
+    pub t: Option<f64>,
+    pub version: String,
+    pub md5sums: HashMap<String, Option<String>>,
+    pub backup: Option<Vec<String>>,
+}
+
+#[derive(Clone)]
+struct PackageUpdate {
+    name_old: String,
+    version_old: String,
+    name_new: String,
+    version_new: String,
+    url: String,
+    local_fn: String,
+}
+
+fn as_unix_path(pth: &Path) -> String {
+    let mut ret = pth
+        .components()
+        .map(|x| x.as_os_str().to_string_lossy())
+        .join("/");
+    if pth.is_absolute() {
+        ret = format!("/{ret}");
+    }
+    ret
+}
+
+// TODO: move to utils or something?
+// TODO: make this a macro
+// TODO: actually use this? ;-)
+pub fn prn(s: &str) {
+    if std::io::stdout().is_terminal() {
+        log::info!("{s}");
+        println!("{s}");
+    }
+}
+
+fn make_progress_bar(len: u64, prefix: &str, template: &str) -> indicatif::ProgressBar {
+    let progress_bar = indicatif::ProgressBar::new(len).with_prefix(prefix.to_string());
+    progress_bar.set_style(
+        indicatif::ProgressStyle::default_bar()
+            .template(template)
+            .unwrap()
+            .tick_chars(r"|/-\ ")
+            .progress_chars("##-"),
+    );
+    progress_bar
+}
+
+pub fn get_installed_packages(db_fn: &str) -> anyhow::Result<HashMap<String, InstalledPackage>> {
+    if !Path::new(db_fn).exists() {
+        return Ok(HashMap::new());
+    }
+    let mut f = File::open(db_fn)?;
+    let mut content = String::new();
+    f.read_to_string(&mut content)?;
+    let installed_packages: HashMap<String, InstalledPackage> = serde_json::from_str(&content)?;
+    Ok(installed_packages)
+}
+
+pub fn save_installed_packages(
+    installed_packages: &HashMap<String, InstalledPackage>,
+    db_fn: &str,
+) -> anyhow::Result<()> {
+    let mut f = File::create(db_fn)?;
+
+    let encoder = serde_json::ser::PrettyFormatter::with_indent(b"  ");
+    let mut ser = serde_json::Serializer::with_formatter(&mut f, encoder);
+    installed_packages.serialize(&mut ser)?;
+
+    Ok(())
+}
+
+fn get_available_packages(repos: Vec<String>, offline: bool) -> HashMap<String, Vec<String>> {
+    repos
+        .into_par_iter()
+        .map(|repo| {
+            let subret = get_repo_listing(&repo).into_iter().filter_map(|url| {
+                if offline && is_url(&repo) {
+                    return None;
+                }
+                let package_fn = get_package_fn(&url).unwrap();
+                if !is_valid_package_fn(&package_fn) {
+                    log::warn!("{package_fn} not a valid package filename");
+                    return None;
+                }
+                let package_name = get_package_name(&package_fn);
+                Some((package_name, url))
+            });
+            subret.collect::<Vec<_>>()
+        })
+        .flatten()
+        .collect::<Vec<_>>()
+        .into_iter()
+        .into_group_map()
+}
+
+fn is_valid_package_fn(fn_: &str) -> bool {
+    let re = lazy_regex::regex!(r"[\w\-\.]+-[\d.]+-\d+\.atxpkg\.zip");
+    re.is_match(fn_)
+}
+
+fn is_url(s: &str) -> bool {
+    s.starts_with("http://") || s.starts_with("https://")
+}
+
+fn get_repo_listing(repo: &str) -> Vec<String> {
+    log::info!("getting repo listing from {repo}");
+
+    if is_url(repo) {
+        match get_repo_listing_http(repo) {
+            Ok(res) => return res,
+            Err(err) => {
+                log::error!("failed to get listing from {repo}: {err}");
+                return vec![];
+            }
+        }
+    }
+
+    match get_repo_listing_dir(repo) {
+        Ok(ret) => ret,
+        Err(err) => {
+            log::error!("error accessing directory: {err}");
+            vec![]
+        }
+    }
+}
+
+fn get_repo_listing_http(url: &str) -> anyhow::Result<Vec<String>> {
+    //let client = reqwest::blocking::Client::new();
+    //let mut response = client.get(url).send()?;
+    let response = ureq::get(url).call()?;
+
+    //let total_size = response.content_length().unwrap_or(0);
+    let total_size = response
+        .header("Content-Length")
+        .unwrap_or("0")
+        .parse::<u64>()?;
+
+    let progress_bar = make_progress_bar(
+        total_size,
+        url,
+        "{spinner} {prefix} [{wide_bar}] {bytes}/{total_bytes} ({bytes_per_sec})",
+    );
+    progress_bar.enable_steady_tick(Duration::from_millis(200));
+
+    let mut body = String::new();
+    progress_bar
+        //.wrap_read(response.by_ref())
+        .wrap_read(response.into_reader())
+        .read_to_string(&mut body)?;
+
+    //resp.read_to_string(&mut body)?;
+
+    let re = lazy_regex::regex!(r"[\w\-\._:/]+\.atxpkg\.\w+");
+    let files: Vec<String> = re
+        .find_iter(&body)
+        .map(|mat| format!("{url}/{}", mat.as_str()))
+        .collect();
+
+    progress_bar.finish();
+
+    Ok(files)
+}
+
+fn get_repo_listing_dir(path: &str) -> anyhow::Result<Vec<String>> {
+    let mut ret = Vec::new();
+
+    for entry in walkdir::WalkDir::new(path).into_iter() {
+        let entry = entry?;
+        if entry.file_type().is_dir() {
+            continue;
+        }
+        let file_path = entry.path();
+        if !file_path.to_string_lossy().ends_with(".atxpkg.zip") {
+            continue;
+        }
+        ret.push(file_path.to_string_lossy().replace('\\', "/"));
+    }
+
+    Ok(ret)
+}
+
+fn download_package_if_needed(
+    url: &str,
+    cache_dir: &str,
+    progress_bar: Option<&indicatif::ProgressBar>,
+) -> anyhow::Result<String> {
+    if !is_url(url) {
+        return Ok(url.to_string());
+    }
+
+    let fn_ = format!("{cache_dir}/{}", get_package_fn(url).unwrap());
+    let fn_temp = format!("{fn_}_");
+
+    if Path::new(&fn_).exists() {
+        log::info!("using cached {fn_}");
+        return Ok(fn_);
+    }
+
+    log::info!("downloading {url} to {fn_}");
+    let mut resume_from = 0;
+
+    if Path::new(&fn_temp).exists() {
+        /*let client = reqwest::blocking::Client::new();
+        let resp = client.head(url).send()?;
+        if resp.status().is_success()
+            && resp
+                .headers()
+                .get("Accept-Ranges")
+                .map_or(false, |v| v == "bytes")
+        {
+            if let Ok(metadata) = std::fs::metadata(&fn_temp) {
+                resume_from = metadata.len();
+            }
+        }*/
+
+        let resp = ureq::head(url).call();
+        if let Ok(resp) = resp {
+            if resp.header("Accept-Ranges").map_or(false, |v| v == "bytes") {
+                if let Ok(metadata) = std::fs::metadata(&fn_temp) {
+                    resume_from = metadata.len();
+                }
+            }
+        }
+    }
+
+    let f = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&fn_temp)?;
+
+    //let client = reqwest::blocking::Client::new();
+    //let mut req = client.get(url);
+    let mut req = ureq::get(url);
+
+    if resume_from > 0 {
+        log::info!("resuming from {resume_from}");
+        //req = req.header(reqwest::header::RANGE, format!("bytes={}-", resume_from));
+        req = req.set("Range", &format!("bytes={resume_from}-"));
+    }
+
+    //let mut resp = req.send()?;
+    let resp = req.call();
+    //if !resp.status().is_success() {
+    let Ok(resp) = resp else {
+        return Err(anyhow::anyhow!(
+            "Failed to download file: {}",
+            //resp.status()
+            resp.unwrap_err(),
+        ));
+    };
+
+    //let size_to_download = resp.content_length().unwrap_or(0);
+    let size_to_download = resp
+        .header("Content-Length")
+        .unwrap()
+        .parse::<u64>()
+        .unwrap();
+
+    let mut reader = resp.into_reader();
+
+    if let Some(pb) = progress_bar {
+        pb.set_length(resume_from + size_to_download);
+        pb.set_position(resume_from);
+        pb.reset_eta();
+        pb.enable_steady_tick(Duration::from_millis(200));
+        reader = Box::new(pb.wrap_read(reader));
+    }
+
+    let mut writer = std::io::BufWriter::new(f);
+    std::io::copy(&mut reader, &mut writer)?;
+    writer.flush()?;
+
+    if let Some(pb) = progress_bar {
+        pb.finish();
+    }
+
+    log::trace!("renaming {fn_temp} to {fn_}");
+    std::fs::rename(&fn_temp, &fn_)?;
+
+    Ok(fn_)
+}
+
+fn try_delete(fn_: &str) -> anyhow::Result<()> {
+    if std::fs::metadata(fn_).is_err() {
+        // TODO: shouldn't we fail here?
+        return Ok(());
+    }
+
+    if !Path::new(&fn_).is_file() {
+        anyhow::bail!("not a file: {fn_}");
+    }
+
+    let mut del_fn = format!("{fn_}.atxpkg_delete");
+    while Path::new(&del_fn).exists() {
+        if let Err(err) = std::fs::remove_file(&del_fn) {
+            log::warn!("failed to remove file: {del_fn} - error: {err}");
+        } else {
+            break;
+        }
+        del_fn.push_str("_delete");
+    }
+
+    log::trace!("renaming {fn_} to {del_fn}");
+    std::fs::rename(fn_, &del_fn)?;
+
+    if let Err(err) = std::fs::remove_file(&del_fn) {
+        log::warn!("failed to remove file: {del_fn} - error: {err}");
+    }
+
+    Ok(())
+}
+
+pub fn list_available(
+    packages: Vec<String>,
+    repos: Vec<String>,
+    offline: bool,
+) -> anyhow::Result<Vec<(String, String)>> {
+    let mut ret = Vec::new();
+    let available_packages = get_available_packages(repos, offline);
+
+    if packages.is_empty() {
+        let mut keys: Vec<String> = available_packages.keys().map(|x| x.to_string()).collect();
+        keys.sort();
+        keys.dedup();
+        for k in keys {
+            ret.push((k.clone(), String::new()));
+        }
+    } else {
+        for p in &packages {
+            if let Some(urls) = available_packages.get(p) {
+                for url in urls {
+                    let version = get_package_version(&get_package_fn(url).unwrap());
+                    ret.push((p.clone(), version.clone()));
+                }
+            } else {
+                return Err(anyhow::anyhow!("package {p} not available"));
+            }
+        }
+    }
+    Ok(ret)
+}
+
+fn split_package_name_version(pkg_spec: &str) -> (String, String) {
+    let re = lazy_regex::regex!(r"^(.+?)(?:-([\d.-]+))?(?:\.atxpkg\.zip)?$");
+    let matches = re.captures(pkg_spec);
+
+    if let Some(caps) = matches {
+        let name = caps.get(1).map_or("", |m| m.as_str()).to_string();
+        let version = caps.get(2).map_or("", |m| m.as_str()).to_string();
+        return (name, version);
+    }
+
+    (String::new(), String::new())
+}
+
+fn get_package_fn(url: &str) -> Option<String> {
+    let parts: Vec<String> = url.split('/').map(|x| x.to_string()).collect();
+    if parts.is_empty() {
+        return None;
+    }
+    Some(parts.last().unwrap_or(&"".to_string()).to_string())
+}
+
+fn get_package_name(fn_: &str) -> String {
+    let (name, _) = split_package_name_version(fn_);
+    name
+}
+
+fn get_package_version(fn_: &str) -> String {
+    let (_, version) = split_package_name_version(fn_);
+    version
+}
+
+pub fn if_installed(
+    packages: Vec<String>,
+    installed_packages: &HashMap<String, InstalledPackage>,
+) -> anyhow::Result<()> {
+    for p in packages {
+        let (package_name, package_version) = split_package_name_version(&p);
+        if let Some(installed_package) = installed_packages.get(&package_name) {
+            if !package_version.is_empty() && package_version != installed_package.version {
+                return Err(anyhow::anyhow!(
+                    "package {package_name}-{package_version} not installed"
+                ));
+            }
+        } else {
+            return Err(anyhow::anyhow!("package {package_name} not installed"));
+        }
+    }
+    Ok(())
+}
+
+pub fn clean_cache(cache_dir: &str) -> anyhow::Result<()> {
+    let files = std::fs::read_dir(cache_dir)?;
+
+    for file in files {
+        let file = file?;
+        let file_path = file.path();
+
+        if file_path.file_name().is_some() {
+            let file_path_str = file_path.to_string_lossy().into_owned();
+            std::fs::remove_file(&file_path)?;
+            eprintln!("D {file_path_str}");
+        }
+    }
+
+    Ok(())
+}
+
+pub fn install_packages(
+    packages: Vec<String>,
+    installed_packages: &HashMap<String, InstalledPackage>,
+    prefix: &str,
+    repos: Vec<String>,
+    force: bool,
+    offline: bool,
+    yes: bool,
+    no: bool,
+    download_only: bool,
+    cache_dir: &str,
+    tmp_dir_prefix: &str,
+) -> anyhow::Result<Option<HashMap<String, InstalledPackage>>> {
+    let available_packages = get_available_packages(repos, offline);
+
+    for p in &packages {
+        let package_name = get_package_name(p);
+        if installed_packages.contains_key(&package_name) {
+            if !force && !download_only {
+                return Err(anyhow::anyhow!("package {package_name} already installed"));
+            }
+        }
+        if !available_packages.contains_key(&package_name) {
+            return Err(anyhow::anyhow!(
+                "unable to find url for package {package_name}"
+            ));
+        }
+    }
+
+    let mut urls_to_install = vec![];
+    for p in &packages {
+        let (package_name, package_version) = split_package_name_version(p);
+        let package_urls = available_packages.get(&package_name).unwrap(); // safe unwrap due to earlier check
+        let url = if !package_version.is_empty() {
+            get_specific_version_url(package_urls.clone(), &package_version)
+        } else {
+            get_max_version_url(package_urls.clone())
+        }
+        .unwrap();
+        urls_to_install.push(url.clone());
+        let (package_name, package_version) =
+            split_package_name_version(&get_package_fn(&url).unwrap());
+        if download_only {
+            println!("download {package_name}-{package_version}");
+        } else {
+            println!("install {package_name}-{package_version}");
+        }
+    }
+
+    if !no && !(yes || yes_no("continue?", "y")) {
+        return Ok(None);
+    }
+
+    let mb = indicatif::MultiProgress::new();
+
+    let local_fns_to_install = urls_to_install
+        .into_par_iter()
+        .map(|url| {
+            let package_name = get_package_name(&get_package_fn(&url).unwrap());
+            let pb = make_progress_bar(
+                0,
+                &package_name,
+                "{spinner} {prefix} [{wide_bar}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})",
+            );
+            mb.add(pb.clone());
+            download_package_if_needed(&url, cache_dir, Some(&pb)).unwrap()
+        })
+        .collect::<Vec<_>>();
+
+    //mb.clear()?;
+
+    if download_only {
+        return Ok(None);
+    }
+
+    let mut installed_packages = installed_packages.clone();
+
+    for local_fn in &local_fns_to_install {
+        let (package_name, package_version) =
+            split_package_name_version(&get_package_fn(local_fn).unwrap());
+        let package_info = install_package(local_fn, prefix, force, tmp_dir_prefix)?;
+        // TODO: mutation here? wtf?
+        installed_packages.insert(package_name.clone(), package_info);
+        println!("{package_name}-{package_version} is now installed");
+    }
+
+    Ok(Some(installed_packages))
+}
+
+fn yes_no(prompt: &str, default: &str) -> bool {
+    assert!(
+        !default.is_empty() || std::io::stdin().is_terminal(),
+        "Input is not a TTY"
+    );
+
+    let question = match default {
+        "y" => format!("{prompt} [Y/n] "),
+        "n" => format!("{prompt} [y/N] "),
+        _ => format!("{prompt} [y/n] "),
+    };
+
+    loop {
+        print!("{question}");
+        std::io::stdout().flush().unwrap();
+
+        let mut ans = String::new();
+        std::io::stdin()
+            .read_line(&mut ans)
+            .expect("Failed to read line");
+        let ans = ans.trim().to_lowercase();
+
+        match ans.as_str() {
+            "y" | "yes" => return true,
+            "n" | "no" => return false,
+            "" => {
+                if default == "y" {
+                    return true;
+                } else if default == "n" {
+                    return false;
+                }
+            }
+            _ => println!("Invalid input. Please enter 'y' or 'n'."),
+        }
+    }
+}
+
+fn get_max_version_url(urls: Vec<String>) -> Option<String> {
+    let mut max_version_url: Option<String> = None;
+    for url in urls {
+        let package_version = get_package_version(&get_package_fn(&url)?);
+        if let Some(max_version_url_) = &max_version_url {
+            let max_version = get_package_version(&get_package_fn(max_version_url_)?);
+            if compare_versions(&package_version, &max_version) == std::cmp::Ordering::Greater {
+                max_version_url = Some(url);
+            }
+        } else {
+            max_version_url = Some(url);
+        }
+    }
+    max_version_url
+}
+
+fn get_max_version(urls: Vec<String>) -> Option<String> {
+    Some(get_package_version(&get_package_fn(&get_max_version_url(
+        urls,
+    )?)?))
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_get_max_version() {
+        assert_eq!(
+            get_max_version(vec![
+                "http://atxpkg.asterix.cz/neco.dev-20240722223041-1.atxpkg.zip".to_string(),
+                "http://atxpkg-dev.asterix.cz/neco.dev-20240722223042-1.atxpkg.zip".to_string(),
+                "/neco/na/disku/neco.dev-20240722223043-1.atxpkg.zip".to_string(),
+            ]),
+            Some("20240722223043-1".to_string())
+        )
+    }
+}
+
+fn split_ver(ver: &str) -> Vec<u64> {
+    let regex = lazy_regex::regex!(r"[.-]");
+    let parts: Vec<_> = regex.split(ver).map(|x| x.to_string()).collect();
+    parts
+        .into_iter()
+        .map(|x| x.parse::<u64>().unwrap())
+        .collect()
+}
+
+fn compare_versions(v1: &str, v2: &str) -> std::cmp::Ordering {
+    let split_v1 = split_ver(v1);
+    let split_v2 = split_ver(v2);
+    split_v1.cmp(&split_v2)
+}
+
+fn get_specific_version_url(urls: Vec<String>, version: &str) -> Option<String> {
+    for url in urls {
+        if get_package_version(&get_package_fn(&url)?) == version {
+            return Some(url.clone());
+        }
+    }
+    None
+}
+
+fn install_package(
+    fn_path: &str,
+    prefix: &str,
+    force: bool,
+    tmp_dir_prefix: &str,
+) -> anyhow::Result<InstalledPackage> {
+    let (name, version_new) = split_package_name_version(&get_package_fn(fn_path).unwrap());
+    log::info!("installing {name}-{version_new}");
+    println!("installing {name}-{version_new}");
+
+    let mut ret = InstalledPackage {
+        t: Some(UNIX_EPOCH.elapsed().unwrap().as_secs_f64()),
+        version: version_new.clone(),
+        md5sums: HashMap::new(),
+        backup: Some(Vec::new()),
+    };
+
+    let tmp_dir = tempfile::Builder::new().tempdir_in(tmp_dir_prefix)?;
+    let tmp_dir_path = tmp_dir.path().to_str().unwrap();
+    log::debug!("tmpDir: {tmp_dir_path}");
+
+    unzip_to(fn_path, tmp_dir_path)?;
+
+    if let Ok(content) = read_lines(&format!("{tmp_dir_path}/.atxpkg_backup")) {
+        ret.backup = Some(content);
+    }
+
+    let (dirs, mut files) = get_recursive_listing(tmp_dir_path)?;
+    files.retain(|x| !x.starts_with(".atxpkg_"));
+
+    if !force {
+        for f in &files {
+            let target_fn = format!("{prefix}/{f}");
+            if Path::new(&target_fn).exists() {
+                return Err(anyhow::anyhow!("file exists: {target_fn}"));
+            }
+        }
+    }
+
+    let n = dirs.len() + files.len();
+    let progress_bar = make_progress_bar(
+        n.try_into()?,
+        &name,
+        "{spinner} {prefix} [{wide_bar}] {pos}/{len}",
+    );
+
+    for d in progress_bar.wrap_iter(dirs.into_iter().sorted_by_key(|x| x.len())) {
+        log::trace!("tmp_path_dir {tmp_dir_path} dir {d}");
+        let target_dir = format!("{prefix}/{d}");
+        log::debug!("target_dir {target_dir}");
+        log::debug!("ID {d}");
+        if !Path::new(&target_dir).exists() {
+            std::fs::create_dir(&target_dir)?;
+        }
+        let src_info = std::fs::metadata(format!("{tmp_dir_path}/{d}"))?;
+        std::fs::set_permissions(&target_dir, src_info.permissions())?;
+        let mod_time = src_info.modified().unwrap_or(std::time::SystemTime::now());
+        filetime::set_file_times(&target_dir, mod_time.into(), mod_time.into())?;
+        ret.md5sums.insert(as_unix_path(Path::new(&d)), None);
+    }
+
+    for f in progress_bar.wrap_iter(files.into_iter()) {
+        let target_fn = format!("{prefix}/{f}");
+        log::debug!("IF {target_fn}");
+        let sum = get_md5_sum(&format!("{tmp_dir_path}/{f}"))?;
+        ret.md5sums.insert(as_unix_path(Path::new(&f)), Some(sum));
+
+        if Path::new(&target_fn).exists() && ret.backup.clone().unwrap_or_default().contains(&f) {
+            log::info!("saving untracked {target_fn} as {target_fn}.atxpkg_save");
+            println!("saving untracked {target_fn} as {target_fn}.atxpkg_save");
+            std::fs::rename(&target_fn, format!("{target_fn}.atxpkg_save"))?;
+        }
+
+        // TODO: do we really need to delete? can't we just overwrite?
+        try_delete(&target_fn)?;
+        // TODO: rename instead of copy+remove?
+        std::fs::copy(&format!("{tmp_dir_path}/{f}"), &target_fn)?;
+        // no need for remove, really, since the whole tmp dir will be removed eventually
+        // but i'm doing this to be sure that we don't need that much extra disk space
+        std::fs::remove_file(format!("{tmp_dir_path}/{f}"))?;
+    }
+
+    progress_bar.finish();
+
+    Ok(ret)
+}
+
+fn get_md5_sum(file_path: &str) -> anyhow::Result<String> {
+    let mut file = File::open(file_path)?;
+    let mut hasher = Md5::new();
+    let mut buffer = Vec::new();
+
+    // TODO: not a good idea to read the entire file to memory
+    file.read_to_end(&mut buffer)?;
+    hasher.update(&buffer);
+
+    let hash = hasher.finalize();
+    Ok(hex::encode(hash))
+}
+
+fn unzip_to(zip_file: &str, output_dir: &str) -> anyhow::Result<()> {
+    log::debug!("unzip {zip_file} to {output_dir}");
+
+    let file = File::open(zip_file)?;
+    let mut archive = zip::read::ZipArchive::new(file)?;
+
+    let progress_bar = make_progress_bar(
+        archive.len().try_into()?,
+        &get_package_fn(zip_file).unwrap(),
+        "{spinner} {prefix} [{wide_bar}] {pos}/{len}",
+    );
+
+    for i in progress_bar.wrap_iter(0..archive.len()) {
+        let mut file = archive.by_index(i)?;
+        let outpath = Path::new(&output_dir).join(file.name());
+        log::trace!("unzip {}", as_unix_path(&outpath));
+
+        if (file.name()).ends_with('/') {
+            std::fs::create_dir_all(&outpath)?;
+        } else {
+            if let Some(p) = outpath.parent() {
+                if !p.exists() {
+                    std::fs::create_dir_all(p)?;
+                }
+            }
+            let mut outfile = File::create(&outpath)?;
+            std::io::copy(&mut file, &mut outfile)?;
+        }
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(
+                &outpath,
+                std::fs::Permissions::from_mode(file.unix_mode().unwrap_or(0o755)),
+            )?;
+        }
+
+        // TODO: so i have to do this shit to get file times right - still, i don't like it
+        let mtime = file.last_modified().unwrap();
+        let stime = time::OffsetDateTime::try_from(mtime)?;
+        // TODO: getting local offset seems to fail on linux - solve somehow
+        let stime = stime.replace_offset(
+            time::UtcOffset::current_local_offset().unwrap_or(time::UtcOffset::UTC),
+        );
+        let ftime = filetime::FileTime::from_unix_time(stime.unix_timestamp(), 0);
+        filetime::set_file_times(&outpath, ftime, ftime)?;
+    }
+
+    progress_bar.finish();
+    log::debug!("done unzipping");
+    Ok(())
+}
+
+fn get_recursive_listing(path_base: &str) -> anyhow::Result<(Vec<String>, Vec<String>)> {
+    let mut ret_dirs = Vec::new();
+    let mut ret_files = Vec::new();
+
+    for entry in walkdir::WalkDir::new(path_base) {
+        let entry = entry?;
+        let path = entry.path();
+        let path_ = path.strip_prefix(path_base)?;
+        let path_str = path_.to_string_lossy().to_string();
+        if path_str.is_empty() {
+            continue;
+        }
+        if path.is_dir() {
+            log::trace!("cut path D: {path_str}");
+            ret_dirs.push(path_str);
+        } else {
+            log::trace!("cut path F: {path_str}");
+            ret_files.push(path_str);
+        }
+    }
+
+    Ok((ret_dirs, ret_files))
+}
+
+fn read_lines(fn_: &str) -> anyhow::Result<Vec<String>> {
+    let file = File::open(fn_)?;
+    let reader = std::io::BufReader::new(file);
+
+    let mut lines = Vec::new();
+    for line in reader.lines() {
+        lines.push(line?);
+    }
+
+    Ok(lines)
+}
+
+pub fn update_package(
+    fn_zip: &str,
+    name_old: &str,
+    installed_package: InstalledPackage,
+    prefix: &str,
+    force: bool,
+    tmp_dir_prefix: &str,
+) -> anyhow::Result<InstalledPackage> {
+    let version_old = installed_package.version.clone();
+    let (name, version_new) = split_package_name_version(&get_package_fn(fn_zip).unwrap());
+    log::info!("updating {name_old}-{version_old} -> {name}-{version_new}");
+    println!("updating {name_old}-{version_old} -> {name}-{version_new}");
+
+    let mut ret = InstalledPackage {
+        t: Some(UNIX_EPOCH.elapsed().unwrap().as_secs_f64()),
+        version: version_new.clone(),
+        md5sums: HashMap::new(),
+        backup: Some(Vec::new()),
+    };
+
+    let tmp_dir = tempfile::Builder::new().tempdir_in(tmp_dir_prefix)?;
+    let tmp_dir_path = tmp_dir.path().to_str().unwrap();
+    unzip_to(fn_zip, tmp_dir_path)?;
+
+    if let Ok(content) = read_lines(&format!("{tmp_dir_path}/.atxpkg_backup")) {
+        ret.backup = Some(content);
+    }
+
+    let (dirs, mut files) = get_recursive_listing(tmp_dir_path)?;
+    files.retain(|x| !x.starts_with(".atxpkg_"));
+
+    if !force {
+        for f in &files {
+            let target_fn = format!("{prefix}/{f}");
+            if Path::new(&target_fn).exists() {
+                if !installed_package
+                    .md5sums
+                    .contains_key(&as_unix_path(Path::new(&f)))
+                {
+                    return Err(anyhow::anyhow!(
+                        "{f} already exists but is not part of original package"
+                    ));
+                }
+            }
+        }
+    }
+
+    let n = dirs.len() + files.len();
+    let progress_bar = make_progress_bar(
+        n.try_into()?,
+        &name,
+        "{spinner} {prefix} [{wide_bar}] {pos}/{len}",
+    );
+
+    for d in progress_bar.wrap_iter(dirs.into_iter().sorted()) {
+        let target_dir = format!("{prefix}/{d}");
+        log::debug!("UD {target_dir}");
+        if !Path::new(&target_dir).exists() {
+            std::fs::create_dir(&target_dir)?;
+        }
+        ret.md5sums.insert(as_unix_path(Path::new(&d)), None);
+    }
+
+    for f in progress_bar.wrap_iter(files.into_iter()) {
+        let sum_new = get_md5_sum(&format!("{tmp_dir_path}/{f}"))?;
+        ret.md5sums
+            .insert(as_unix_path(Path::new(&f)), Some(sum_new.clone()));
+
+        let mut target_fn = format!("{prefix}/{f}");
+        if Path::new(&target_fn).exists() && ret.backup.clone().unwrap_or_default().contains(&f) {
+            if let Some(Some(sum_original)) = installed_package.md5sums.get(&f) {
+                let sum_current = get_md5_sum(&target_fn)?;
+                if sum_original != &sum_new
+                    && sum_original != &sum_current
+                    && sum_current != sum_new
+                {
+                    log::info!(
+                        "sum for file {target_fn} changed, installing new version as {target_fn}.atxpkg_new"
+                    );
+                    println!(
+                        "sum for file {target_fn} changed, installing new version as {target_fn}.atxpkg_new"
+                    );
+                    target_fn += ".atxpkg_new";
+                }
+            }
+        }
+        log::debug!("U {target_fn}");
+        // TODO: do we really need to delete here? can't we just overwrite?
+        try_delete(&target_fn)?;
+        // TODO: rename instead of copy+remove?
+        std::fs::copy(&format!("{tmp_dir_path}/{f}"), &target_fn)?;
+        // no need for remove, really, since the whole tmp dir will be removed eventually
+        // but i'm doing this to be sure that we don't need that much extra disk space
+        std::fs::remove_file(format!("{tmp_dir_path}/{f}"))?;
+    }
+
+    progress_bar.finish();
+
+    let mut dirs_old = vec![];
+    let mut files_old = vec![];
+    for (fn_or_dir_old, md5sum_old) in installed_package.md5sums.into_iter() {
+        if let Some(md5sum_old) = md5sum_old {
+            files_old.push((fn_or_dir_old, md5sum_old));
+        } else {
+            dirs_old.push(fn_or_dir_old);
+        }
+    }
+
+    for (fn_old, md5sum_old) in files_old.into_iter() {
+        if ret.md5sums.contains_key(&fn_old) {
+            continue;
+        }
+        let target_fn = format!("{prefix}/{fn_old}");
+        if !Path::new(&target_fn).exists() {
+            log::warn!("file {target_fn} does not exist");
+            continue;
+        }
+        if installed_package
+            .backup
+            .clone()
+            .unwrap_or_default()
+            .contains(&fn_old)
+        {
+            let sum_current = get_md5_sum(&target_fn)?;
+            if sum_current != *md5sum_old {
+                log::info!("saving changed {target_fn} as {target_fn}.atxpkg_save");
+                println!("saving changed {target_fn} as {target_fn}.atxpkg_save",);
+                std::fs::rename(&target_fn, format!("{target_fn}.atxpkg_save"))?;
+            }
+        } else {
+            log::debug!("DF {target_fn}");
+            try_delete(&target_fn)?;
+        }
+    }
+
+    for dir_name in dirs_old.into_iter().sorted_by_key(|x| x.len()).rev() {
+        if ret.md5sums.contains_key(&dir_name) {
+            continue;
+        }
+
+        let target_fn = format!("{prefix}/{dir_name}");
+        if !Path::new(&target_fn).exists() {
+            log::warn!("dir {target_fn} does not exist");
+            continue;
+        }
+
+        let dir_name = Path::new(&target_fn);
+        if dir_name != Path::new(&prefix) {
+            if is_empty_dir(dir_name)? {
+                log::debug!("DD {}", as_unix_path(dir_name));
+                std::fs::remove_dir(dir_name)?;
+            }
+        }
+    }
+
+    Ok(ret)
+}
+
+pub fn remove_packages(
+    packages: Vec<String>,
+    installed_packages: &HashMap<String, InstalledPackage>,
+    prefix: &str,
+    yes: bool,
+    no: bool,
+) -> anyhow::Result<Option<HashMap<String, InstalledPackage>>> {
+    for p in &packages {
+        let (package_name, mut package_version) = split_package_name_version(p);
+        let installed_package = installed_packages.get(&package_name);
+        if installed_package.is_none() {
+            return Err(anyhow::anyhow!("package {package_name} not installed"));
+        }
+        let installed_package = installed_package.unwrap();
+        if !package_version.is_empty() {
+            if package_version != installed_package.version {
+                return Err(anyhow::anyhow!(
+                    "package {package_name}-{package_version} not installed"
+                ));
+            }
+        } else {
+            package_version = installed_package.version.clone();
+        }
+
+        println!("remove {package_name}-{package_version}");
+    }
+
+    if no || !(yes || yes_no("continue?", "n")) {
+        return Ok(None);
+    }
+
+    let mut installed_packages = installed_packages.clone();
+
+    for p in &packages {
+        let package_name = get_package_name(p);
+        remove_package(&package_name, &installed_packages, prefix)?;
+        installed_packages.remove(&package_name);
+    }
+
+    Ok(Some(installed_packages))
+}
+
+pub fn remove_package(
+    package_name: &str,
+    installed_packages: &HashMap<String, InstalledPackage>,
+    prefix: &str,
+) -> anyhow::Result<()> {
+    let version = &installed_packages[package_name].version;
+    log::info!("removing {package_name}-{version}");
+    let package_info = &installed_packages[package_name];
+
+    let progress_bar = make_progress_bar(
+        package_info.md5sums.len().try_into()?,
+        package_name,
+        "{spinner} {prefix} [{wide_bar}] {pos}/{len}",
+    );
+
+    let mut dirs = vec![];
+    let mut files = vec![];
+    for (file_or_dir_name, md5sum) in package_info.md5sums.iter() {
+        if let Some(md5sum) = md5sum {
+            files.push((file_or_dir_name, md5sum.clone()));
+        } else {
+            dirs.push(file_or_dir_name);
+        }
+    }
+
+    for (file_name, md5sum) in progress_bar.wrap_iter(files.iter()) {
+        let target_fn = format!("{prefix}/{file_name}");
+        if !Path::new(&target_fn).exists() {
+            log::warn!("{target_fn} does not exist!");
+            continue;
+        }
+
+        let mut backup = false;
+        if package_info
+            .backup
+            .clone()
+            .unwrap_or_default()
+            .contains(file_name)
+        {
+            let current_sum = get_md5_sum(&target_fn)?;
+            if current_sum != *md5sum {
+                backup = true;
+            }
+        }
+
+        if backup {
+            log::info!("{target_fn} changed, saving as {target_fn}.atxpkg_backup");
+            println!("{target_fn} changed, saving as {target_fn}.atxpkg_backup");
+            std::fs::rename(&target_fn, format!("{target_fn}.atxpkg_backup"))?;
+        } else {
+            log::debug!("DF {target_fn}");
+            try_delete(&target_fn)?;
+        }
+    }
+    for dir_name in dirs.into_iter().sorted_by_key(|x| x.len()).rev() {
+        let target_fn = format!("{prefix}/{dir_name}");
+        if !Path::new(&target_fn).exists() {
+            log::warn!("{target_fn} does not exist!");
+            continue;
+        }
+
+        let dir_name = Path::new(&target_fn);
+        if dir_name != Path::new(&prefix) {
+            if is_empty_dir(dir_name)? {
+                log::debug!("DD {}", as_unix_path(dir_name));
+                std::fs::remove_dir(dir_name)?;
+            }
+        }
+    }
+    progress_bar.finish();
+    Ok(())
+}
+
+pub fn is_empty_dir(path: &Path) -> anyhow::Result<bool> {
+    Ok(path.read_dir()?.next().is_none())
+}
+
+pub fn update_packages(
+    packages: Vec<String>,
+    installed_packages: &HashMap<String, InstalledPackage>,
+    prefix: &str,
+    repos: Vec<String>,
+    force: bool,
+    offline: bool,
+    yes: bool,
+    no: bool,
+    download_only: bool,
+    cache_dir: &str,
+    tmp_dir_prefix: &str,
+) -> anyhow::Result<Option<HashMap<String, InstalledPackage>>> {
+    let mut package_updates = vec![];
+
+    for p in &packages {
+        let pu = if p.contains("..") {
+            let package_parts: Vec<&str> = p.split("..").collect();
+            let (package_old, package_new) = (package_parts[0], package_parts[1]);
+            let (package_name_old, package_version_old) = split_package_name_version(package_old);
+            let (package_name_new, package_version_new) = split_package_name_version(package_new);
+            PackageUpdate {
+                name_old: package_name_old,
+                version_old: package_version_old,
+                name_new: package_name_new,
+                version_new: package_version_new,
+                url: String::new(),
+                local_fn: String::new(),
+            }
+        } else {
+            let (name, version) = split_package_name_version(p);
+            PackageUpdate {
+                name_old: name.clone(),
+                version_old: String::new(),
+                name_new: name,
+                version_new: version,
+                url: String::new(),
+                local_fn: String::new(),
+            }
+        };
+        package_updates.push(pu);
+    }
+
+    for pu in &mut package_updates {
+        let Some(installed_package) = installed_packages.get(&pu.name_old) else {
+            return Err(anyhow::anyhow!("package {} not installed", pu.name_old));
+        };
+        if !pu.version_old.is_empty() && pu.version_old != installed_package.version {
+            return Err(anyhow::anyhow!(
+                "package {}-{} not installed",
+                pu.name_old,
+                pu.version_old
+            ));
+        }
+
+        if pu.version_old.is_empty() {
+            pu.version_old = installed_package.version.clone();
+        }
+
+        if pu.name_old != pu.name_new && installed_packages.contains_key(&pu.name_new) {
+            return Err(anyhow::anyhow!("package {} already installed", pu.name_new));
+        }
+    }
+
+    let available_packages = get_available_packages(repos, offline);
+
+    for pu in &mut package_updates {
+        if !available_packages.contains_key(&pu.name_new) {
+            return Err(anyhow::anyhow!("package {} not available", pu.name_new));
+        }
+
+        if pu.version_new.is_empty() {
+            pu.version_new = get_max_version(available_packages[&pu.name_new].clone()).unwrap();
+        }
+
+        let url =
+            get_specific_version_url(available_packages[&pu.name_new].clone(), &pu.version_new);
+        if url.clone().unwrap().is_empty() {
+            return Err(anyhow::anyhow!(
+                "package {}-{} not available",
+                pu.name_new,
+                pu.version_new
+            ));
+        }
+        pu.url = url.unwrap();
+    }
+
+    package_updates
+        .retain(|pu| force || pu.name_old != pu.name_new || pu.version_old != pu.version_new);
+
+    if package_updates.is_empty() {
+        println!("nothing to update");
+        return Ok(None);
+    }
+
+    for pu in &package_updates {
+        println!(
+            "update {}-{} -> {}-{}",
+            pu.name_old, pu.version_old, pu.name_new, pu.version_new
+        );
+    }
+
+    if !no && !(yes || yes_no("continue?", "y")) {
+        return Ok(None);
+    }
+
+    let mut installed_packages = installed_packages.clone();
+
+    let mb = indicatif::MultiProgress::new();
+
+    let package_updates =
+        package_updates
+            .par_iter()
+            .map(|pu| {
+                let pb = make_progress_bar(0, &pu.name_new,
+                "{spinner} {prefix} [{wide_bar}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})");
+                mb.add(pb.clone());
+                let local_fn = download_package_if_needed(&pu.url, cache_dir, Some(&pb)).unwrap();
+                PackageUpdate {
+                    name_old: pu.name_old.clone(),
+                    version_old: pu.version_old.clone(),
+                    name_new: pu.name_new.clone(),
+                    version_new: pu.version_new.clone(),
+                    url: pu.url.clone(),
+                    local_fn,
+                }
+            })
+            .collect::<Vec<_>>();
+
+    //mb.clear()?;
+
+    if download_only {
+        return Ok(None);
+    }
+
+    for pu in package_updates {
+        let mut package_info = update_package(
+            &pu.local_fn,
+            &pu.name_old,
+            installed_packages[&pu.name_old].clone(),
+            prefix,
+            force,
+            tmp_dir_prefix,
+        )?;
+
+        package_info.t = Some(UNIX_EPOCH.elapsed().unwrap().as_secs_f64());
+        installed_packages.remove(&pu.name_old);
+        installed_packages.insert(pu.name_new.clone(), package_info);
+        log::info!(
+            "{}-{} updated to {}-{}",
+            pu.name_old,
+            pu.version_old,
+            pu.name_new,
+            pu.version_new
+        );
+        println!(
+            "{}-{} updated to {}-{}",
+            pu.name_old, pu.version_old, pu.name_new, pu.version_new
+        );
+    }
+
+    Ok(Some(installed_packages))
+}
+
+fn check_package(package_name: &str, pkg: &InstalledPackage, prefix: &str) -> anyhow::Result<u32> {
+    let n = pkg.md5sums.len();
+    let progress_bar = make_progress_bar(
+        n.try_into()?,
+        package_name,
+        "{spinner} {prefix} [{wide_bar}] {pos}/{len}",
+    );
+
+    let mut err_count = 0;
+    for (fn_name, md5sum) in progress_bar.wrap_iter(pkg.md5sums.iter()) {
+        let file_path = format!("{prefix}/{fn_name}");
+        if !Path::new(&file_path).exists() {
+            println!("{package_name}: does not exist: {file_path}");
+            err_count += 1;
+        }
+        if let Some(md5sum) = md5sum {
+            if pkg.backup.clone().unwrap_or_default().contains(fn_name) {
+                continue;
+            }
+            if let Ok(current_md5sum) = get_md5_sum(&file_path) {
+                if current_md5sum != *md5sum {
+                    println!("{package_name}: checksum difference: {file_path}");
+                    err_count += 1;
+                }
+            }
+        }
+    }
+
+    progress_bar.finish();
+
+    Ok(err_count)
+}
+
+pub fn check_packages(
+    packages: Vec<String>,
+    installed_packages: &HashMap<String, InstalledPackage>,
+    prefix: &str,
+) -> anyhow::Result<()> {
+    for package in &packages {
+        let (package_name, package_version) = split_package_name_version(package);
+        if !installed_packages.contains_key(&package_name)
+            || (!package_version.is_empty()
+                && package_version != installed_packages[&package_name].version)
+        {
+            return Err(anyhow::anyhow!("{package_name} not installed"));
+        }
+    }
+
+    let mut err_count = 0;
+    for package in &packages {
+        let package_name = split_package_name_version(package).0;
+        if let Some(installed_package) = installed_packages.get(&package_name) {
+            err_count += check_package(package, installed_package, prefix)?;
+        }
+    }
+
+    if err_count > 0 {
+        return Err(anyhow::anyhow!("error count: {err_count}"));
+    }
+
+    Ok(())
+}
+
+fn gen_fn_to_package_name_mapping(
+    installed_packages: &HashMap<String, InstalledPackage>,
+) -> HashMap<String, String> {
+    let mut fn_to_package_name = HashMap::new();
+    for (package_name, pkginfo) in installed_packages {
+        for fn_name in pkginfo.md5sums.keys() {
+            fn_to_package_name.insert(fn_name.clone(), package_name.clone());
+        }
+    }
+    fn_to_package_name
+}
+
+pub fn show_untracked(
+    paths: Vec<String>,
+    installed_packages: &HashMap<String, InstalledPackage>,
+    prefix: &str,
+) -> anyhow::Result<()> {
+    let fn_to_package_name = gen_fn_to_package_name_mapping(installed_packages);
+
+    let paths = if paths.is_empty() {
+        let mut first_dirs = HashSet::new();
+        for fn_ in fn_to_package_name.keys() {
+            let first_dir = Path::new(fn_).components().next().unwrap();
+            first_dirs.insert(first_dir);
+        }
+        let first_dirs = first_dirs
+            .into_iter()
+            .map(|x| x.as_os_str().to_str().unwrap().to_string())
+            .collect::<Vec<_>>();
+        log::debug!("first_dirs: {first_dirs:?}");
+        first_dirs
+    } else {
+        paths
+    };
+
+    for path in paths.into_iter() {
+        let full_path = format!("{prefix}/{path}");
+        let (dirs, files) = get_recursive_listing(&full_path)?;
+
+        let n = dirs.len() + files.len();
+        let progress_bar = make_progress_bar(
+            n.try_into()?,
+            &path,
+            "{spinner} {prefix} [{wide_bar}] {pos}/{len}",
+        );
+
+        for dir_name in progress_bar.wrap_iter(dirs.into_iter()) {
+            let full_dir_name = format!("{path}/{dir_name}");
+            let xx = as_unix_path(Path::new(&full_dir_name));
+            if !fn_to_package_name.contains_key(&xx) {
+                println!("unknown: {xx}");
+            }
+        }
+        for fn_name in progress_bar.wrap_iter(files.into_iter()) {
+            let full_fn_name = format!("{path}/{fn_name}");
+            let xx = as_unix_path(Path::new(&full_fn_name));
+            if !fn_to_package_name.contains_key(&xx) {
+                println!("unknown: {xx}");
+            }
+        }
+
+        progress_bar.finish();
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_recursive_listing() {
+        let tmp_dir = tempfile::Builder::new().tempdir().unwrap();
+        let tmp_dir_str = tmp_dir.path().to_str().unwrap();
+
+        std::fs::create_dir(format!("{tmp_dir_str}/test")).unwrap();
+        std::fs::write(format!("{tmp_dir_str}/test/new"), "x\n").unwrap();
+
+        let (dirs, files) = get_recursive_listing(tmp_dir_str).unwrap();
+
+        assert_eq!(dirs, vec!["test"]);
+        assert_eq!(files, vec!["test/new"]);
+
+        std::fs::create_dir(format!("{tmp_dir_str}/some_prefix")).unwrap();
+        std::fs::create_dir(format!("{tmp_dir_str}/some_prefix/test")).unwrap();
+        std::fs::write(format!("{tmp_dir_str}/some_prefix/test/new"), "x\n").unwrap();
+
+        let (dirs, files) = get_recursive_listing(&format!("{tmp_dir_str}/some_prefix")).unwrap();
+
+        assert_eq!(dirs, vec!["test"]);
+        assert_eq!(files, vec!["test/new"]);
+    }
+
+    #[test]
+    fn test_install_package() {
+        let dest_dir = tempfile::Builder::new().tempdir().unwrap();
+        let dest_dir_str = dest_dir.path().to_str().unwrap().to_string();
+        let tmp_dir = tempfile::Builder::new().tempdir().unwrap();
+
+        let pkginfo = install_package(
+            "./test_data/atx300-base-6.3-1.atxpkg.zip",
+            &dest_dir_str,
+            false,
+            tmp_dir.path().to_str().unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!(pkginfo.version, "6.3-1");
+        assert!(Path::new(&format!("{dest_dir_str}/atx300/memsh.mem")).exists());
+        assert!(!Path::new(&format!("{dest_dir_str}/atx300/.atxpkg_backup")).exists());
+    }
+
+    #[test]
+    fn test_update_package_with_conflict() {
+        let dest_dir = tempfile::Builder::new().tempdir().unwrap();
+        let dest_dir_str = dest_dir.path().to_str().unwrap();
+        let tmp_dir = tempfile::Builder::new().tempdir().unwrap();
+
+        let pkginfo = install_package(
+            "./test_data/test-1.0-1.atxpkg.zip",
+            dest_dir_str,
+            false,
+            tmp_dir.path().to_str().unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!(pkginfo.version, "1.0-1");
+
+        std::fs::write(format!("{dest_dir_str}/test/new"), "x\n").unwrap();
+
+        let pkginfo = update_package(
+            "./test_data/test-2.0-1.atxpkg.zip",
+            "test",
+            pkginfo,
+            dest_dir_str,
+            false,
+            tmp_dir.path().to_str().unwrap(),
+        );
+        assert!(pkginfo.is_err());
+    }
+
+    #[test]
+    fn test_update_package_with_backup() {
+        let dest_dir = tempfile::Builder::new().tempdir().unwrap();
+        let dest_dir_str = dest_dir.path().to_str().unwrap();
+        let tmp_dir = tempfile::Builder::new().tempdir().unwrap();
+
+        let pkginfo = install_package(
+            "./test_data/test-1.0-1.atxpkg.zip",
+            dest_dir_str,
+            false,
+            tmp_dir.path().to_str().unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!(pkginfo.version, "1.0-1");
+
+        std::fs::write(format!("{dest_dir_str}/test/protected1"), "x\n").unwrap();
+        std::fs::write(format!("{dest_dir_str}/test/protected2"), "2\n").unwrap();
+        std::fs::write(format!("{dest_dir_str}/test/unprotected2"), "2\n").unwrap();
+
+        let pkginfo = update_package(
+            "./test_data/test-2.0-1.atxpkg.zip",
+            "test",
+            pkginfo,
+            &dest_dir_str,
+            false,
+            tmp_dir.path().to_str().unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!(pkginfo.version, "2.0-1");
+
+        assert!(Path::new(&format!("{dest_dir_str}/test/protected1.atxpkg_new")).exists());
+        assert!(!Path::new(&format!("{dest_dir_str}/test/protected2.atxpkg_new")).exists());
+        assert!(!Path::new(&format!("{dest_dir_str}/test/protected3.atxpkg_new")).exists());
+        assert!(!Path::new(&format!("{dest_dir_str}/test/unprotected.atxpkg_new")).exists());
+    }
+
+    #[test]
+    fn test_update_remove_with_backup() {
+        let dest_dir = tempfile::Builder::new().tempdir().unwrap();
+        let dest_dir_str = dest_dir.path().to_str().unwrap();
+        let tmp_dir = tempfile::Builder::new().tempdir().unwrap();
+
+        let pkginfo = install_package(
+            "./test_data/test-1.0-1.atxpkg.zip",
+            dest_dir_str,
+            false,
+            tmp_dir.path().to_str().unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!(pkginfo.version, "1.0-1");
+
+        std::fs::write(format!("{dest_dir_str}/test/protected1"), "x\n").unwrap();
+        std::fs::write(format!("{dest_dir_str}/test/protected2"), "2\n").unwrap();
+        std::fs::write(format!("{dest_dir_str}/test/unprotected2"), "2\n").unwrap();
+
+        let mut installed_packages: HashMap<String, InstalledPackage> = HashMap::new();
+        installed_packages.insert("test".to_string(), pkginfo);
+
+        let _ = remove_package("test", &installed_packages, dest_dir_str).unwrap();
+
+        assert!(Path::new(&format!("{dest_dir_str}/test/protected1.atxpkg_backup")).exists());
+        assert!(Path::new(&format!("{dest_dir_str}/test/protected2.atxpkg_backup")).exists());
+        assert!(!Path::new(&format!("{dest_dir_str}/test/protected3.atxpkg_backup")).exists());
+        assert!(!Path::new(&format!("{dest_dir_str}/test/unprotected.atxpkg_backup")).exists());
+    }
+}

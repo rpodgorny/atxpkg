@@ -7,7 +7,7 @@ export pkgrel=1
 
 git submodule update --recursive --init
 
-rm -rf build dist
+rm -rf target_xxx
 
 #./compile_vagrant.sh
 ./compile_docker.sh
@@ -15,9 +15,9 @@ rm -rf build dist
 rm -rf pkg
 mkdir pkg
 mkdir -p pkg/${name}
-cp -av dist/* pkg/${name}/
+cp -av target_xxx/x86_64-pc-windows-gnu/release/*.exe pkg/${name}/
 
-rm -rf build dist
+rm -rf target_xxx
 
 if [ -d pkg_data ]; then
   cp -rv pkg_data/* pkg/

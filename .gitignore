@@ -2,3 +2,8 @@ __pycache__
 /*.atxpkg.zip
 htmlcov
 .coverage
+
+
+# Added by cargo
+
+/target
