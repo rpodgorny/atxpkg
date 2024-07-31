@@ -16,14 +16,14 @@ log = "0.4.22"
 log-panics = { version = "2.1.0", features = ["with-backtrace"] }
 md-5 = "0.10.6"
 rayon = "1.10.0"
+reqwest = { version = "0.12.5", features = ["blocking", "native-tls-vendored", "rustls-tls"] }
 serde = { version = "1.0.204", features = ["derive"] }
-serde_json = "1.0.120"
+serde_json = "1.0.121"
 simplelog = "0.12.2"
 tempfile = "3.10.1"
 time = { version = "0.3.36", features = ["local-offset", "macros"] }
-ureq = "2.10.0"
 walkdir = "2.5.0"
-zip = { version = "2.1.5", features = ["time"] }
+zip = { version = "2.1.6", features = ["time"] }
 
 # TODO: i still can't figure out how to only include debug info for my own code
 [profile.release]

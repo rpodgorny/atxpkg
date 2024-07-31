@@ -145,15 +145,12 @@ fn get_repo_listing(repo: &str, unverified_ssl: bool) -> Vec<String> {
 }
 
 fn get_repo_listing_http(url: &str, unverified_ssl: bool) -> anyhow::Result<Vec<String>> {
-    //let client = reqwest::blocking::Client::new();
-    //let mut response = client.get(url).send()?;
-    let response = ureq::get(url).call()?;
+    let client = reqwest::blocking::ClientBuilder::new()
+        .danger_accept_invalid_certs(unverified_ssl)
+        .build()?;
+    let mut response = client.get(url).send()?;
 
-    //let total_size = response.content_length().unwrap_or(0);
-    let total_size = response
-        .header("Content-Length")
-        .unwrap_or("0")
-        .parse::<u64>()?;
+    let total_size = response.content_length().unwrap_or(0);
 
     let progress_bar = make_progress_bar(
         total_size,
@@ -164,11 +161,8 @@ fn get_repo_listing_http(url: &str, unverified_ssl: bool) -> anyhow::Result<Vec<
 
     let mut body = String::new();
     progress_bar
-        //.wrap_read(response.by_ref())
-        .wrap_read(response.into_reader())
+        .wrap_read(response.by_ref())
         .read_to_string(&mut body)?;
-
-    //resp.read_to_string(&mut body)?;
 
     let re = lazy_regex::regex!(r"[\w\-\._:/]+\.atxpkg\.\w+");
     let files: Vec<String> = re
@@ -221,7 +215,9 @@ fn download_package_if_needed(
     let mut resume_from = 0;
 
     if Path::new(&fn_temp).exists() {
-        /*let client = reqwest::blocking::Client::new();
+        let client = reqwest::blocking::ClientBuilder::new()
+            .danger_accept_invalid_certs(unverified_ssl)
+            .build()?;
         let resp = client.head(url).send()?;
         if resp.status().is_success()
             && resp
@@ -232,15 +228,6 @@ fn download_package_if_needed(
             if let Ok(metadata) = std::fs::metadata(&fn_temp) {
                 resume_from = metadata.len();
             }
-        }*/
-
-        let resp = ureq::head(url).call();
-        if let Ok(resp) = resp {
-            if resp.header("Accept-Ranges").map_or(false, |v| v == "bytes") {
-                if let Ok(metadata) = std::fs::metadata(&fn_temp) {
-                    resume_from = metadata.len();
-                }
-            }
         }
     }
 
@@ -249,35 +236,27 @@ fn download_package_if_needed(
         .append(true)
         .open(&fn_temp)?;
 
-    //let client = reqwest::blocking::Client::new();
-    //let mut req = client.get(url);
-    let mut req = ureq::get(url);
+    let client = reqwest::blocking::ClientBuilder::new()
+        .danger_accept_invalid_certs(unverified_ssl)
+        .build()?;
+    let mut req = client.get(url);
 
     if resume_from > 0 {
         log::info!("resuming from {resume_from}");
-        //req = req.header(reqwest::header::RANGE, format!("bytes={}-", resume_from));
-        req = req.set("Range", &format!("bytes={resume_from}-"));
+        req = req.header(reqwest::header::RANGE, format!("bytes={}-", resume_from));
     }
 
-    //let mut resp = req.send()?;
-    let resp = req.call();
-    //if !resp.status().is_success() {
-    let Ok(resp) = resp else {
+    let resp = req.send()?;
+    if !resp.status().is_success() {
         return Err(anyhow::anyhow!(
             "Failed to download file: {}",
-            //resp.status()
-            resp.unwrap_err(),
+            resp.status()
         ));
     };
 
-    //let size_to_download = resp.content_length().unwrap_or(0);
-    let size_to_download = resp
-        .header("Content-Length")
-        .unwrap()
-        .parse::<u64>()
-        .unwrap();
+    let size_to_download = resp.content_length().unwrap_or(0);
 
-    let mut reader = resp.into_reader();
+    let mut reader: Box<dyn std::io::Read> = Box::new(resp);
 
     if let Some(pb) = progress_bar {
         pb.set_length(resume_from + size_to_download);
@@ -620,12 +599,12 @@ fn get_specific_version_url(urls: Vec<String>, version: &str) -> Option<String> 
 }
 
 fn install_package(
-    fn_path: &str,
+    fn_zip: &str,
     prefix: &str,
     force: bool,
     tmp_dir_prefix: &str,
 ) -> anyhow::Result<InstalledPackage> {
-    let (name, version_new) = split_package_name_version(&get_package_fn(fn_path).unwrap());
+    let (name, version_new) = split_package_name_version(&get_package_fn(fn_zip).unwrap());
     log::info!("installing {name}-{version_new}");
     println!("installing {name}-{version_new}");
 
@@ -633,14 +612,12 @@ fn install_package(
         t: Some(UNIX_EPOCH.elapsed().unwrap().as_secs_f64()),
         version: version_new.clone(),
         md5sums: HashMap::new(),
-        backup: Some(Vec::new()),
+        backup: None,
     };
 
     let tmp_dir = tempfile::Builder::new().tempdir_in(tmp_dir_prefix)?;
     let tmp_dir_path = tmp_dir.path().to_str().unwrap();
-    log::debug!("tmpDir: {tmp_dir_path}");
-
-    unzip_to(fn_path, tmp_dir_path)?;
+    unzip_to(fn_zip, tmp_dir_path)?;
 
     if let Ok(content) = read_lines(&format!("{tmp_dir_path}/.atxpkg_backup")) {
         ret.backup = Some(content);
@@ -826,7 +803,7 @@ pub fn update_package(
         t: Some(UNIX_EPOCH.elapsed().unwrap().as_secs_f64()),
         version: version_new.clone(),
         md5sums: HashMap::new(),
-        backup: Some(Vec::new()),
+        backup: None,
     };
 
     let tmp_dir = tempfile::Builder::new().tempdir_in(tmp_dir_prefix)?;
