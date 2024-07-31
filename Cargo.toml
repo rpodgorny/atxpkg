@@ -26,7 +26,7 @@ walkdir = "2.5.0"
 zip = { version = "2.1.6", features = ["time"] }
 
 # TODO: i still can't figure out how to only include debug info for my own code
-[profile.release]
-debug = true
-[profile.release.package."*"]
-debug = false
+#[profile.release]
+#debug = true
+#[profile.release.package."*"]
+#debug = false

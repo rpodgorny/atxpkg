@@ -47,6 +47,17 @@ pub fn prn(s: &str) {
     }
 }
 
+fn move_file(from: &str, to: &str) -> anyhow::Result<()> {
+    // TODO: do we really need to delete here? can't we just overwrite?
+    try_delete(to)?;
+    // TODO: rename instead of copy+remove?
+    std::fs::copy(from, to)?;
+    // no need for remove, really, since the whole tmp dir will be removed eventually
+    // but i'm doing this to be sure that we don't need that much extra disk space
+    std::fs::remove_file(from)?;
+    Ok(())
+}
+
 fn make_progress_bar(len: u64, prefix: &str, template: &str) -> indicatif::ProgressBar {
     let progress_bar = indicatif::ProgressBar::new(len).with_prefix(prefix.to_string());
     progress_bar.set_style(
@@ -231,6 +242,7 @@ fn download_package_if_needed(
         }
     }
 
+    // TODO: would buffered writer speed things up?
     let f = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
@@ -617,7 +629,7 @@ fn install_package(
 
     let tmp_dir = tempfile::Builder::new().tempdir_in(tmp_dir_prefix)?;
     let tmp_dir_path = tmp_dir.path().to_str().unwrap();
-    unzip_to(fn_zip, tmp_dir_path)?;
+    unzip_to(fn_zip, tmp_dir_path, &name)?;
 
     if let Ok(content) = read_lines(&format!("{tmp_dir_path}/.atxpkg_backup")) {
         ret.backup = Some(content);
@@ -627,17 +639,24 @@ fn install_package(
     files.retain(|x| !x.starts_with(".atxpkg_"));
 
     if !force {
-        for f in &files {
+        let progress_bar = make_progress_bar(
+            files.len().try_into()?,
+            &name,
+            "{spinner} {prefix}: check [{wide_bar}] {pos}/{len}",
+        );
+
+        for f in progress_bar.wrap_iter(files.iter()) {
             let target_fn = format!("{prefix}/{f}");
             if Path::new(&target_fn).exists() {
                 return Err(anyhow::anyhow!("file exists: {target_fn}"));
             }
         }
+
+        progress_bar.finish();
     }
 
-    let n = dirs.len() + files.len();
     let progress_bar = make_progress_bar(
-        n.try_into()?,
+        (dirs.len() + files.len()).try_into()?,
         &name,
         "{spinner} {prefix} [{wide_bar}] {pos}/{len}",
     );
@@ -669,6 +688,8 @@ fn install_package(
             std::fs::rename(&target_fn, format!("{target_fn}.atxpkg_save"))?;
         }
 
+        move_file(&format!("{tmp_dir_path}/{f}"), &target_fn)?;
+        /*
         // TODO: do we really need to delete? can't we just overwrite?
         try_delete(&target_fn)?;
         // TODO: rename instead of copy+remove?
@@ -676,6 +697,7 @@ fn install_package(
         // no need for remove, really, since the whole tmp dir will be removed eventually
         // but i'm doing this to be sure that we don't need that much extra disk space
         std::fs::remove_file(format!("{tmp_dir_path}/{f}"))?;
+        */
     }
 
     progress_bar.finish();
@@ -684,6 +706,7 @@ fn install_package(
 }
 
 fn get_md5_sum(file_path: &str) -> anyhow::Result<String> {
+    // TODO: would a buffered reader speed things up?
     let mut file = File::open(file_path)?;
     let mut hasher = Md5::new();
     let mut buffer = Vec::new();
@@ -696,16 +719,17 @@ fn get_md5_sum(file_path: &str) -> anyhow::Result<String> {
     Ok(hex::encode(hash))
 }
 
-fn unzip_to(zip_file: &str, output_dir: &str) -> anyhow::Result<()> {
+fn unzip_to(zip_file: &str, output_dir: &str, progress_bar_prefix: &str) -> anyhow::Result<()> {
     log::debug!("unzip {zip_file} to {output_dir}");
 
+    // TODO: would buffered reader speed things up?
     let file = File::open(zip_file)?;
     let mut archive = zip::read::ZipArchive::new(file)?;
 
     let progress_bar = make_progress_bar(
         archive.len().try_into()?,
-        &get_package_fn(zip_file).unwrap(),
-        "{spinner} {prefix} [{wide_bar}] {pos}/{len}",
+        progress_bar_prefix,
+        "{spinner} {prefix}: unzip [{wide_bar}] {pos}/{len}",
     );
 
     for i in progress_bar.wrap_iter(0..archive.len()) {
@@ -757,9 +781,8 @@ fn get_recursive_listing(path_base: &str) -> anyhow::Result<(Vec<String>, Vec<St
     for entry in walkdir::WalkDir::new(path_base) {
         let entry = entry?;
         let path = entry.path();
-        let path_ = path.strip_prefix(path_base)?;
-        //let path_str = path_.to_string_lossy().to_string();
-        let path_str = as_unix_path(path_);
+        let path_relative = path.strip_prefix(path_base)?;
+        let path_str = as_unix_path(path_relative);
         if path_str.is_empty() {
             continue;
         }
@@ -775,16 +798,25 @@ fn get_recursive_listing(path_base: &str) -> anyhow::Result<(Vec<String>, Vec<St
     Ok((ret_dirs, ret_files))
 }
 
-fn read_lines(fn_: &str) -> anyhow::Result<Vec<String>> {
+/*
+fn read_lines_OLD(fn_: &str) -> anyhow::Result<Vec<String>> {
     let file = File::open(fn_)?;
     let reader = std::io::BufReader::new(file);
 
     let mut lines = Vec::new();
     for line in reader.lines() {
-        lines.push(line?);
+        lines.push(line?.trim().to_string());
     }
 
     Ok(lines)
+}
+*/
+
+fn read_lines(fn_: &str) -> anyhow::Result<Vec<String>> {
+    Ok(std::fs::read_to_string(fn_)?
+        .split('\n')
+        .map(|s| s.trim().to_string())
+        .collect::<Vec<_>>())
 }
 
 pub fn update_package(
@@ -809,7 +841,7 @@ pub fn update_package(
 
     let tmp_dir = tempfile::Builder::new().tempdir_in(tmp_dir_prefix)?;
     let tmp_dir_path = tmp_dir.path().to_str().unwrap();
-    unzip_to(fn_zip, tmp_dir_path)?;
+    unzip_to(fn_zip, tmp_dir_path, &name)?;
 
     if let Ok(content) = read_lines(&format!("{tmp_dir_path}/.atxpkg_backup")) {
         ret.backup = Some(content);
@@ -819,6 +851,12 @@ pub fn update_package(
     files.retain(|x| !x.starts_with(".atxpkg_"));
 
     if !force {
+        let progress_bar = make_progress_bar(
+            files.len().try_into()?,
+            &name,
+            "{spinner} {prefix}: check [{wide_bar}] {pos}/{len}",
+        );
+
         for f in &files {
             let target_fn = format!("{prefix}/{f}");
             if Path::new(&target_fn).exists() {
@@ -829,13 +867,14 @@ pub fn update_package(
                 }
             }
         }
+
+        progress_bar.finish();
     }
 
-    let n = dirs.len() + files.len();
     let progress_bar = make_progress_bar(
-        n.try_into()?,
+        (dirs.len() + files.len()).try_into()?,
         &name,
-        "{spinner} {prefix} [{wide_bar}] {pos}/{len}",
+        "{spinner} {prefix}: update [{wide_bar}] {pos}/{len}",
     );
 
     for d in progress_bar.wrap_iter(dirs.into_iter().sorted()) {
@@ -852,6 +891,7 @@ pub fn update_package(
         ret.md5sums.insert(f.clone(), Some(sum_new.clone()));
 
         let mut target_fn = format!("{prefix}/{f}");
+        log::debug!("U {target_fn}");
         if Path::new(&target_fn).exists() && ret.backup.clone().unwrap_or_default().contains(&f) {
             if let Some(Some(sum_original)) = installed_package.md5sums.get(&f) {
                 let sum_current = get_md5_sum(&target_fn)?;
@@ -869,7 +909,8 @@ pub fn update_package(
                 }
             }
         }
-        log::debug!("U {target_fn}");
+        move_file(&format!("{tmp_dir_path}/{f}"), &target_fn)?;
+        /*
         // TODO: do we really need to delete here? can't we just overwrite?
         try_delete(&target_fn)?;
         // TODO: rename instead of copy+remove?
@@ -877,6 +918,7 @@ pub fn update_package(
         // no need for remove, really, since the whole tmp dir will be removed eventually
         // but i'm doing this to be sure that we don't need that much extra disk space
         std::fs::remove_file(format!("{tmp_dir_path}/{f}"))?;
+        */
     }
 
     progress_bar.finish();
@@ -891,7 +933,13 @@ pub fn update_package(
         }
     }
 
-    for (fn_old, md5sum_old) in files_old.into_iter() {
+    let progress_bar = make_progress_bar(
+        (dirs_old.len() + files_old.len()).try_into()?,
+        &name,
+        "{spinner} {prefix}: cleanup [{wide_bar}] {pos}/{len}",
+    );
+
+    for (fn_old, md5sum_old) in progress_bar.wrap_iter(files_old.into_iter()) {
         if ret.md5sums.contains_key(&fn_old) {
             continue;
         }
@@ -918,7 +966,7 @@ pub fn update_package(
         }
     }
 
-    for dir_name in dirs_old.into_iter().sorted_by_key(|x| x.len()).rev() {
+    for dir_name in progress_bar.wrap_iter(dirs_old.into_iter().sorted_by_key(|x| x.len()).rev()) {
         if ret.md5sums.contains_key(&dir_name) {
             continue;
         }
@@ -937,6 +985,8 @@ pub fn update_package(
             }
         }
     }
+
+    progress_bar.finish();
 
     Ok(ret)
 }
@@ -995,7 +1045,7 @@ pub fn remove_package(
     let progress_bar = make_progress_bar(
         package_info.md5sums.len().try_into()?,
         package_name,
-        "{spinner} {prefix} [{wide_bar}] {pos}/{len}",
+        "{spinner} {prefix}: remove [{wide_bar}] {pos}/{len}",
     );
 
     let mut dirs = vec![];
@@ -1228,9 +1278,8 @@ pub fn update_packages(
 }
 
 fn check_package(package_name: &str, pkg: &InstalledPackage, prefix: &str) -> anyhow::Result<u32> {
-    let n = pkg.md5sums.len();
     let progress_bar = make_progress_bar(
-        n.try_into()?,
+        pkg.md5sums.len().try_into()?,
         package_name,
         "{spinner} {prefix} [{wide_bar}] {pos}/{len}",
     );
@@ -1329,9 +1378,8 @@ pub fn show_untracked(
         let full_path = format!("{prefix}/{path}");
         let (dirs, files) = get_recursive_listing(&full_path)?;
 
-        let n = dirs.len() + files.len();
         let progress_bar = make_progress_bar(
-            n.try_into()?,
+            (dirs.len() + files.len()).try_into()?,
             &path,
             "{spinner} {prefix} [{wide_bar}] {pos}/{len}",
         );
