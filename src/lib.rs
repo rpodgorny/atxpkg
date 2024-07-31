@@ -654,14 +654,14 @@ fn install_package(
         std::fs::set_permissions(&target_dir, src_info.permissions())?;
         let mod_time = src_info.modified().unwrap_or(std::time::SystemTime::now());
         filetime::set_file_times(&target_dir, mod_time.into(), mod_time.into())?;
-        ret.md5sums.insert(as_unix_path(Path::new(&d)), None);
+        ret.md5sums.insert(d, None);
     }
 
     for f in progress_bar.wrap_iter(files.into_iter()) {
         let target_fn = format!("{prefix}/{f}");
         log::debug!("IF {target_fn}");
         let sum = get_md5_sum(&format!("{tmp_dir_path}/{f}"))?;
-        ret.md5sums.insert(as_unix_path(Path::new(&f)), Some(sum));
+        ret.md5sums.insert(f.clone(), Some(sum));
 
         if Path::new(&target_fn).exists() && ret.backup.clone().unwrap_or_default().contains(&f) {
             log::info!("saving untracked {target_fn} as {target_fn}.atxpkg_save");
@@ -758,7 +758,8 @@ fn get_recursive_listing(path_base: &str) -> anyhow::Result<(Vec<String>, Vec<St
         let entry = entry?;
         let path = entry.path();
         let path_ = path.strip_prefix(path_base)?;
-        let path_str = path_.to_string_lossy().to_string();
+        //let path_str = path_.to_string_lossy().to_string();
+        let path_str = as_unix_path(path_);
         if path_str.is_empty() {
             continue;
         }
@@ -821,10 +822,7 @@ pub fn update_package(
         for f in &files {
             let target_fn = format!("{prefix}/{f}");
             if Path::new(&target_fn).exists() {
-                if !installed_package
-                    .md5sums
-                    .contains_key(&as_unix_path(Path::new(&f)))
-                {
+                if !installed_package.md5sums.contains_key(f) {
                     return Err(anyhow::anyhow!(
                         "{f} already exists but is not part of original package"
                     ));
@@ -846,13 +844,12 @@ pub fn update_package(
         if !Path::new(&target_dir).exists() {
             std::fs::create_dir(&target_dir)?;
         }
-        ret.md5sums.insert(as_unix_path(Path::new(&d)), None);
+        ret.md5sums.insert(d, None);
     }
 
     for f in progress_bar.wrap_iter(files.into_iter()) {
         let sum_new = get_md5_sum(&format!("{tmp_dir_path}/{f}"))?;
-        ret.md5sums
-            .insert(as_unix_path(Path::new(&f)), Some(sum_new.clone()));
+        ret.md5sums.insert(f.clone(), Some(sum_new.clone()));
 
         let mut target_fn = format!("{prefix}/{f}");
         if Path::new(&target_fn).exists() && ret.backup.clone().unwrap_or_default().contains(&f) {
@@ -1023,7 +1020,7 @@ pub fn remove_package(
             .backup
             .clone()
             .unwrap_or_default()
-            .contains(file_name)
+            .contains(&file_name)
         {
             let current_sum = get_md5_sum(&target_fn)?;
             if current_sum != *md5sum {
@@ -1341,16 +1338,14 @@ pub fn show_untracked(
 
         for dir_name in progress_bar.wrap_iter(dirs.into_iter()) {
             let full_dir_name = format!("{path}/{dir_name}");
-            let xx = as_unix_path(Path::new(&full_dir_name));
-            if !fn_to_package_name.contains_key(&xx) {
-                println!("unknown: {xx}");
+            if !fn_to_package_name.contains_key(&full_dir_name) {
+                println!("unknown: {full_dir_name}");
             }
         }
         for fn_name in progress_bar.wrap_iter(files.into_iter()) {
             let full_fn_name = format!("{path}/{fn_name}");
-            let xx = as_unix_path(Path::new(&full_fn_name));
-            if !fn_to_package_name.contains_key(&xx) {
-                println!("unknown: {xx}");
+            if !fn_to_package_name.contains_key(&full_fn_name) {
+                println!("unknown: {full_fn_name}");
             }
         }
 

@@ -96,7 +96,7 @@ struct ShowUntrackedArgs {
 }
 
 // TODO: cut-n-pasted from router and modified - unite!
-fn log_init(fn_: Option<&str>, level: Option<&str>, show: bool) {
+fn log_init(fn_: Option<&str>, level: Option<&str>, show: bool) -> anyhow::Result<()> {
     let log_level_term = if let Some(level) = level {
         level.to_string()
     } else if let Ok(level) = std::env::var("RUST_LOG") {
@@ -104,7 +104,6 @@ fn log_init(fn_: Option<&str>, level: Option<&str>, show: bool) {
     } else {
         "debug".to_string()
     };
-    //let log_level_term = level.unwrap_or_else(|| &std::env::var("RUST_LOG").unwrap_or_else(|_| "debug".to_owned()));
     let log_level_term = match log_level_term.as_str() {
         "trace" => simplelog::LevelFilter::Trace,
         "info" => simplelog::LevelFilter::Info,
@@ -118,7 +117,7 @@ fn log_init(fn_: Option<&str>, level: Option<&str>, show: bool) {
             "[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:6]"
         ))
         .set_time_offset_to_local()
-        .unwrap()
+        .map_err(|_e| anyhow::anyhow!("failed to set time offset to local"))?
         .build();
     let mut loggers: Vec<Box<dyn simplelog::SharedLogger>> = vec![];
     if show {
@@ -137,16 +136,17 @@ fn log_init(fn_: Option<&str>, level: Option<&str>, show: bool) {
             std::fs::OpenOptions::new()
                 .append(true)
                 .create(true)
-                .open(fn_)
-                .unwrap(),
+                .open(fn_)?,
         );
         loggers.push(filelogger);
     }
     if !loggers.is_empty() {
-        simplelog::CombinedLogger::init(loggers).unwrap();
+        simplelog::CombinedLogger::init(loggers)?;
     }
 
     log_panics::init();
+
+    Ok(())
 }
 
 fn main_sub() -> anyhow::Result<()> {
@@ -159,7 +159,7 @@ fn main_sub() -> anyhow::Result<()> {
 
     let log_fn = format!("{root_dir}/atxpkg.log");
 
-    log_init(Some(&log_fn), Some("debug"), mainargs.debug);
+    log_init(Some(&log_fn), Some("debug"), mainargs.debug).unwrap();
 
     log::info!("starting atxpkg v{}", env!("CARGO_PKG_VERSION"));
     eprintln!("starting atxpkg v{}", env!("CARGO_PKG_VERSION"));
