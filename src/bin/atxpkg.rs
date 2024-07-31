@@ -224,6 +224,7 @@ fn main_sub() -> anyhow::Result<()> {
                 args.yes,
                 args.no,
                 args.downloadonly,
+                args.unverified_ssl,
                 &cache_dir,
                 &tmp_dir_prefix,
             )?;
@@ -252,6 +253,7 @@ fn main_sub() -> anyhow::Result<()> {
                 args.yes,
                 args.no,
                 args.downloadonly,
+                args.unverified_ssl,
                 &cache_dir,
                 &tmp_dir_prefix,
             )?;
@@ -290,9 +292,12 @@ fn main_sub() -> anyhow::Result<()> {
             check_packages(packages, &installed_packages, &mainargs.prefix)?;
         }
         Command::ListAvailable(args) => {
-            for (package_name, package_ver) in
-                list_available(args.packages.to_vec(), repos, args.offline)?
-            {
+            for (package_name, package_ver) in list_available(
+                args.packages.to_vec(),
+                repos,
+                args.offline,
+                args.unverified_ssl,
+            )? {
                 if package_ver.is_empty() {
                     println!("{package_name}");
                 } else {

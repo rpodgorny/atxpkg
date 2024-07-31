@@ -83,22 +83,28 @@ pub fn save_installed_packages(
     Ok(())
 }
 
-fn get_available_packages(repos: Vec<String>, offline: bool) -> HashMap<String, Vec<String>> {
+fn get_available_packages(
+    repos: Vec<String>,
+    offline: bool,
+    unverified_ssl: bool,
+) -> HashMap<String, Vec<String>> {
     repos
         .into_par_iter()
         .map(|repo| {
-            let subret = get_repo_listing(&repo).into_iter().filter_map(|url| {
-                if offline && is_url(&repo) {
-                    return None;
-                }
-                let package_fn = get_package_fn(&url).unwrap();
-                if !is_valid_package_fn(&package_fn) {
-                    log::warn!("{package_fn} not a valid package filename");
-                    return None;
-                }
-                let package_name = get_package_name(&package_fn);
-                Some((package_name, url))
-            });
+            let subret = get_repo_listing(&repo, unverified_ssl)
+                .into_iter()
+                .filter_map(|url| {
+                    if offline && is_url(&repo) {
+                        return None;
+                    }
+                    let package_fn = get_package_fn(&url).unwrap();
+                    if !is_valid_package_fn(&package_fn) {
+                        log::warn!("{package_fn} not a valid package filename");
+                        return None;
+                    }
+                    let package_name = get_package_name(&package_fn);
+                    Some((package_name, url))
+                });
             subret.collect::<Vec<_>>()
         })
         .flatten()
@@ -116,11 +122,11 @@ fn is_url(s: &str) -> bool {
     s.starts_with("http://") || s.starts_with("https://")
 }
 
-fn get_repo_listing(repo: &str) -> Vec<String> {
+fn get_repo_listing(repo: &str, unverified_ssl: bool) -> Vec<String> {
     log::info!("getting repo listing from {repo}");
 
     if is_url(repo) {
-        match get_repo_listing_http(repo) {
+        match get_repo_listing_http(repo, unverified_ssl) {
             Ok(res) => return res,
             Err(err) => {
                 log::error!("failed to get listing from {repo}: {err}");
@@ -138,7 +144,7 @@ fn get_repo_listing(repo: &str) -> Vec<String> {
     }
 }
 
-fn get_repo_listing_http(url: &str) -> anyhow::Result<Vec<String>> {
+fn get_repo_listing_http(url: &str, unverified_ssl: bool) -> anyhow::Result<Vec<String>> {
     //let client = reqwest::blocking::Client::new();
     //let mut response = client.get(url).send()?;
     let response = ureq::get(url).call()?;
@@ -196,6 +202,7 @@ fn get_repo_listing_dir(path: &str) -> anyhow::Result<Vec<String>> {
 fn download_package_if_needed(
     url: &str,
     cache_dir: &str,
+    unverified_ssl: bool,
     progress_bar: Option<&indicatif::ProgressBar>,
 ) -> anyhow::Result<String> {
     if !is_url(url) {
@@ -328,9 +335,10 @@ pub fn list_available(
     packages: Vec<String>,
     repos: Vec<String>,
     offline: bool,
+    unverified_ssl: bool,
 ) -> anyhow::Result<Vec<(String, String)>> {
     let mut ret = Vec::new();
-    let available_packages = get_available_packages(repos, offline);
+    let available_packages = get_available_packages(repos, offline, unverified_ssl);
 
     if packages.is_empty() {
         let mut keys: Vec<String> = available_packages.keys().map(|x| x.to_string()).collect();
@@ -431,10 +439,11 @@ pub fn install_packages(
     yes: bool,
     no: bool,
     download_only: bool,
+    unverified_ssl: bool,
     cache_dir: &str,
     tmp_dir_prefix: &str,
 ) -> anyhow::Result<Option<HashMap<String, InstalledPackage>>> {
-    let available_packages = get_available_packages(repos, offline);
+    let available_packages = get_available_packages(repos, offline, unverified_ssl);
 
     for p in &packages {
         let package_name = get_package_name(p);
@@ -486,7 +495,7 @@ pub fn install_packages(
                 "{spinner} {prefix} [{wide_bar}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})",
             );
             mb.add(pb.clone());
-            download_package_if_needed(&url, cache_dir, Some(&pb)).unwrap()
+            download_package_if_needed(&url, cache_dir, unverified_ssl, Some(&pb)).unwrap()
         })
         .collect::<Vec<_>>();
 
@@ -1087,6 +1096,7 @@ pub fn update_packages(
     yes: bool,
     no: bool,
     download_only: bool,
+    unverified_ssl: bool,
     cache_dir: &str,
     tmp_dir_prefix: &str,
 ) -> anyhow::Result<Option<HashMap<String, InstalledPackage>>> {
@@ -1141,7 +1151,7 @@ pub fn update_packages(
         }
     }
 
-    let available_packages = get_available_packages(repos, offline);
+    let available_packages = get_available_packages(repos, offline, unverified_ssl);
 
     for pu in &mut package_updates {
         if !available_packages.contains_key(&pu.name_new) {
@@ -1194,7 +1204,9 @@ pub fn update_packages(
                 let pb = make_progress_bar(0, &pu.name_new,
                 "{spinner} {prefix} [{wide_bar}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})");
                 mb.add(pb.clone());
-                let local_fn = download_package_if_needed(&pu.url, cache_dir, Some(&pb)).unwrap();
+                let local_fn =
+                    download_package_if_needed(&pu.url, cache_dir, unverified_ssl, Some(&pb))
+                        .unwrap();
                 PackageUpdate {
                     name_old: pu.name_old.clone(),
                     version_old: pu.version_old.clone(),

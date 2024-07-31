@@ -6,7 +6,7 @@ use std::path::Path;
 fn test_list_available() {
     let packages = vec![];
     let repos = vec!["./test_data".to_string()];
-    let avail = list_available(packages, repos, false).unwrap();
+    let avail = list_available(packages, repos, false, false).unwrap();
     assert_eq!(
         avail,
         vec![
@@ -33,6 +33,7 @@ fn test_install_packages() {
         false,
         false,
         true,
+        false,
         false,
         false,
         cache_dir.path().to_str().unwrap(),
@@ -91,6 +92,7 @@ fn test_update_packages() {
         true,
         false,
         false,
+        false,
         cache_dir.path().to_str().unwrap(),
         tmp_dir.path().to_str().unwrap(),
     )
@@ -118,6 +120,7 @@ fn test_update_packages() {
         false,
         false,
         true,
+        false,
         false,
         false,
         cache_dir.path().to_str().unwrap(),
@@ -151,6 +154,7 @@ fn test_remove_packages() {
         false,
         false,
         true,
+        false,
         false,
         false,
         cache_dir.path().to_str().unwrap(),
