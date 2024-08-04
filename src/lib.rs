@@ -4,7 +4,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
-use std::io::{BufRead, IsTerminal, Read, Write};
+use std::io::{BufRead, BufReader, IsTerminal, Read, Write};
 use std::path::Path;
 use std::time::{Duration, UNIX_EPOCH};
 
@@ -48,13 +48,15 @@ pub fn prn(s: &str) {
 }
 
 fn move_file(from: &str, to: &str) -> anyhow::Result<()> {
-    // TODO: do we really need to delete here? can't we just overwrite?
+    // we try deletion first because the target file may be held onto by another process
     try_delete(to)?;
-    // TODO: rename instead of copy+remove?
+    std::fs::rename(from, to)?;
+    // the following does a copy+delete instead of a rename - that should work across
+    // filesystems - should we ever need that
+    /*
     std::fs::copy(from, to)?;
-    // no need for remove, really, since the whole tmp dir will be removed eventually
-    // but i'm doing this to be sure that we don't need that much extra disk space
     std::fs::remove_file(from)?;
+    */
     Ok(())
 }
 
@@ -74,9 +76,8 @@ pub fn get_installed_packages(db_fn: &str) -> anyhow::Result<HashMap<String, Ins
     if !Path::new(db_fn).exists() {
         return Ok(HashMap::new());
     }
-    let mut f = File::open(db_fn)?;
     let mut content = String::new();
-    f.read_to_string(&mut content)?;
+    File::open(db_fn)?.read_to_string(&mut content)?;
     let installed_packages: HashMap<String, InstalledPackage> = serde_json::from_str(&content)?;
     Ok(installed_packages)
 }
@@ -502,7 +503,6 @@ pub fn install_packages(
         let (package_name, package_version) =
             split_package_name_version(&get_package_fn(local_fn).unwrap());
         let package_info = install_package(local_fn, prefix, force, tmp_dir_prefix)?;
-        // TODO: mutation here? wtf?
         installed_packages.insert(package_name.clone(), package_info);
         println!("{package_name}-{package_version} is now installed");
     }
@@ -569,23 +569,6 @@ fn get_max_version(urls: Vec<String>) -> Option<String> {
     )?)?))
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_get_max_version() {
-        assert_eq!(
-            get_max_version(vec![
-                "http://atxpkg.asterix.cz/neco.dev-20240722223041-1.atxpkg.zip".to_string(),
-                "http://atxpkg-dev.asterix.cz/neco.dev-20240722223042-1.atxpkg.zip".to_string(),
-                "/neco/na/disku/neco.dev-20240722223043-1.atxpkg.zip".to_string(),
-            ]),
-            Some("20240722223043-1".to_string())
-        )
-    }
-}
-
 fn split_ver(ver: &str) -> Vec<u64> {
     let regex = lazy_regex::regex!(r"[.-]");
     let parts: Vec<_> = regex.split(ver).map(|x| x.to_string()).collect();
@@ -620,22 +603,13 @@ fn install_package(
     log::info!("installing {name}-{version_new}");
     println!("installing {name}-{version_new}");
 
-    let mut ret = InstalledPackage {
-        t: Some(UNIX_EPOCH.elapsed().unwrap().as_secs_f64()),
-        version: version_new.clone(),
-        md5sums: HashMap::new(),
-        backup: None,
-    };
-
     let tmp_dir = tempfile::Builder::new().tempdir_in(tmp_dir_prefix)?;
-    let tmp_dir_path = tmp_dir.path().to_str().unwrap();
-    unzip_to(fn_zip, tmp_dir_path, &name)?;
+    let tmp_dir_path = as_unix_path(tmp_dir.path());
+    unzip_to(fn_zip, &tmp_dir_path, &name)?;
 
-    if let Ok(content) = read_lines(&format!("{tmp_dir_path}/.atxpkg_backup")) {
-        ret.backup = Some(content);
-    }
+    let backup = read_lines(&format!("{tmp_dir_path}/.atxpkg_backup")).ok();
 
-    let (dirs, mut files) = get_recursive_listing(tmp_dir_path)?;
+    let (dirs, mut files) = get_recursive_listing(&tmp_dir_path)?;
     files.retain(|x| !x.starts_with(".atxpkg_"));
 
     if !force {
@@ -655,16 +629,16 @@ fn install_package(
         progress_bar.finish();
     }
 
+    let mut md5sums = HashMap::new();
+
     let progress_bar = make_progress_bar(
         (dirs.len() + files.len()).try_into()?,
         &name,
-        "{spinner} {prefix} [{wide_bar}] {pos}/{len}",
+        "{spinner} {prefix}: install [{wide_bar}] {pos}/{len}",
     );
 
     for d in progress_bar.wrap_iter(dirs.into_iter().sorted_by_key(|x| x.len())) {
-        log::trace!("tmp_path_dir {tmp_dir_path} dir {d}");
         let target_dir = format!("{prefix}/{d}");
-        log::debug!("target_dir {target_dir}");
         log::debug!("ID {d}");
         if !Path::new(&target_dir).exists() {
             std::fs::create_dir(&target_dir)?;
@@ -673,47 +647,52 @@ fn install_package(
         std::fs::set_permissions(&target_dir, src_info.permissions())?;
         let mod_time = src_info.modified().unwrap_or(std::time::SystemTime::now());
         filetime::set_file_times(&target_dir, mod_time.into(), mod_time.into())?;
-        ret.md5sums.insert(d, None);
+        md5sums.insert(d, None);
     }
 
     for f in progress_bar.wrap_iter(files.into_iter()) {
-        let target_fn = format!("{prefix}/{f}");
-        log::debug!("IF {target_fn}");
         let sum = get_md5_sum(&format!("{tmp_dir_path}/{f}"))?;
-        ret.md5sums.insert(f.clone(), Some(sum));
+        md5sums.insert(f.clone(), Some(sum));
 
-        if Path::new(&target_fn).exists() && ret.backup.clone().unwrap_or_default().contains(&f) {
+        let target_fn = format!("{prefix}/{f}");
+        if Path::new(&target_fn).exists() && backup.clone().unwrap_or_default().contains(&f) {
             log::info!("saving untracked {target_fn} as {target_fn}.atxpkg_save");
-            println!("saving untracked {target_fn} as {target_fn}.atxpkg_save");
-            std::fs::rename(&target_fn, format!("{target_fn}.atxpkg_save"))?;
+            progress_bar.println(format!(
+                "saving untracked {target_fn} as {target_fn}.atxpkg_save"
+            ));
+            move_file(&target_fn, &format!("{target_fn}.atxpkg_save"))?;
         }
-
+        log::debug!("IF {target_fn}");
         move_file(&format!("{tmp_dir_path}/{f}"), &target_fn)?;
-        /*
-        // TODO: do we really need to delete? can't we just overwrite?
-        try_delete(&target_fn)?;
-        // TODO: rename instead of copy+remove?
-        std::fs::copy(&format!("{tmp_dir_path}/{f}"), &target_fn)?;
-        // no need for remove, really, since the whole tmp dir will be removed eventually
-        // but i'm doing this to be sure that we don't need that much extra disk space
-        std::fs::remove_file(format!("{tmp_dir_path}/{f}"))?;
-        */
     }
 
     progress_bar.finish();
 
-    Ok(ret)
+    Ok(InstalledPackage {
+        t: Some(UNIX_EPOCH.elapsed().unwrap().as_secs_f64()),
+        version: version_new.clone(),
+        md5sums,
+        backup,
+    })
 }
 
 fn get_md5_sum(file_path: &str) -> anyhow::Result<String> {
-    // TODO: would a buffered reader speed things up?
-    let mut file = File::open(file_path)?;
     let mut hasher = Md5::new();
-    let mut buffer = Vec::new();
+    let mut buffer = Vec::with_capacity(1024 * 1024);
 
+    // TODO: would a buffered reader speed things up?
+    //let mut reader = BufReader::new(&file);
     // TODO: not a good idea to read the entire file to memory
-    file.read_to_end(&mut buffer)?;
+    File::open(file_path)?.read_to_end(&mut buffer)?;
     hasher.update(&buffer);
+
+    // BROKEN
+    /*while let Ok(size) = reader.read(&mut buffer) {
+        if size == 0 {
+            break;
+        }
+        hasher.update(&buffer[..size]);
+    }*/
 
     let hash = hasher.finalize();
     Ok(hex::encode(hash))
@@ -722,9 +701,8 @@ fn get_md5_sum(file_path: &str) -> anyhow::Result<String> {
 fn unzip_to(zip_file: &str, output_dir: &str, progress_bar_prefix: &str) -> anyhow::Result<()> {
     log::debug!("unzip {zip_file} to {output_dir}");
 
-    // TODO: would buffered reader speed things up?
-    let file = File::open(zip_file)?;
-    let mut archive = zip::read::ZipArchive::new(file)?;
+    // TODO: would buffered reader speed things up? - it seems ziparchive takes unbuffered file as input
+    let mut archive = zip::read::ZipArchive::new(File::open(zip_file)?)?;
 
     let progress_bar = make_progress_bar(
         archive.len().try_into()?,
@@ -775,8 +753,7 @@ fn unzip_to(zip_file: &str, output_dir: &str, progress_bar_prefix: &str) -> anyh
 }
 
 fn get_recursive_listing(path_base: &str) -> anyhow::Result<(Vec<String>, Vec<String>)> {
-    let mut ret_dirs = Vec::new();
-    let mut ret_files = Vec::new();
+    let (mut ret_dirs, mut ret_files) = (Vec::new(), Vec::new());
 
     for entry in walkdir::WalkDir::new(path_base) {
         let entry = entry?;
@@ -798,24 +775,11 @@ fn get_recursive_listing(path_base: &str) -> anyhow::Result<(Vec<String>, Vec<St
     Ok((ret_dirs, ret_files))
 }
 
-/*
-fn read_lines_OLD(fn_: &str) -> anyhow::Result<Vec<String>> {
-    let file = File::open(fn_)?;
-    let reader = std::io::BufReader::new(file);
-
-    let mut lines = Vec::new();
-    for line in reader.lines() {
-        lines.push(line?.trim().to_string());
-    }
-
-    Ok(lines)
-}
-*/
-
 fn read_lines(fn_: &str) -> anyhow::Result<Vec<String>> {
     Ok(std::fs::read_to_string(fn_)?
         .split('\n')
         .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty() && !s.starts_with('#'))
         .collect::<Vec<_>>())
 }
 
@@ -832,22 +796,13 @@ pub fn update_package(
     log::info!("updating {name_old}-{version_old} -> {name}-{version_new}");
     println!("updating {name_old}-{version_old} -> {name}-{version_new}");
 
-    let mut ret = InstalledPackage {
-        t: Some(UNIX_EPOCH.elapsed().unwrap().as_secs_f64()),
-        version: version_new.clone(),
-        md5sums: HashMap::new(),
-        backup: None,
-    };
-
     let tmp_dir = tempfile::Builder::new().tempdir_in(tmp_dir_prefix)?;
-    let tmp_dir_path = tmp_dir.path().to_str().unwrap();
-    unzip_to(fn_zip, tmp_dir_path, &name)?;
+    let tmp_dir_path = as_unix_path(tmp_dir.path());
+    unzip_to(fn_zip, &tmp_dir_path, &name)?;
 
-    if let Ok(content) = read_lines(&format!("{tmp_dir_path}/.atxpkg_backup")) {
-        ret.backup = Some(content);
-    }
+    let backup = read_lines(&format!("{tmp_dir_path}/.atxpkg_backup")).ok();
 
-    let (dirs, mut files) = get_recursive_listing(tmp_dir_path)?;
+    let (dirs, mut files) = get_recursive_listing(&tmp_dir_path)?;
     files.retain(|x| !x.starts_with(".atxpkg_"));
 
     if !force {
@@ -871,6 +826,8 @@ pub fn update_package(
         progress_bar.finish();
     }
 
+    let mut md5sums = HashMap::new();
+
     let progress_bar = make_progress_bar(
         (dirs.len() + files.len()).try_into()?,
         &name,
@@ -883,48 +840,81 @@ pub fn update_package(
         if !Path::new(&target_dir).exists() {
             std::fs::create_dir(&target_dir)?;
         }
-        ret.md5sums.insert(d, None);
+        let src_info = std::fs::metadata(format!("{tmp_dir_path}/{d}"))?;
+        std::fs::set_permissions(&target_dir, src_info.permissions())?;
+        let mod_time = src_info.modified().unwrap_or(std::time::SystemTime::now());
+        filetime::set_file_times(&target_dir, mod_time.into(), mod_time.into())?;
+        md5sums.insert(d, None);
     }
 
     for f in progress_bar.wrap_iter(files.into_iter()) {
         let sum_new = get_md5_sum(&format!("{tmp_dir_path}/{f}"))?;
-        ret.md5sums.insert(f.clone(), Some(sum_new.clone()));
+        md5sums.insert(f.clone(), Some(sum_new.clone()));
 
         let mut target_fn = format!("{prefix}/{f}");
-        log::debug!("U {target_fn}");
-        if Path::new(&target_fn).exists() && ret.backup.clone().unwrap_or_default().contains(&f) {
+        if Path::new(&target_fn).exists() && backup.clone().unwrap_or_default().contains(&f) {
             if let Some(Some(sum_original)) = installed_package.md5sums.get(&f) {
                 let sum_current = get_md5_sum(&target_fn)?;
-                if sum_original != &sum_new
-                    && sum_original != &sum_current
-                    && sum_current != sum_new
-                {
+                // only if the user has altered the file and it's altered in a way that it is not the same as the to-be-installed version - only then install the new file to different location
+                if sum_original != &sum_current && &sum_current != &sum_new {
+                    // user has altered the file in a way that it is different from the one in the new package, install the new file to different location
                     log::info!(
                         "sum for file {target_fn} changed, installing new version as {target_fn}.atxpkg_new"
                     );
-                    println!(
-                        "sum for file {target_fn} changed, installing new version as {target_fn}.atxpkg_new"
-                    );
+                    progress_bar.println(format!(
+                        "sum for file {target_fn} changed, installing new version as {target_fn}.atxpkg_new\n"
+                    ));
                     target_fn += ".atxpkg_new";
                 }
+                /*
+                if sum_original != &sum_current {
+                    // user has altered the file
+
+                    if &sum_current == &sum_new {
+                        // the file in new package is the same as the one on disk, overwrite normally (to update file metadata)
+                    } else {
+                        // user has altered the file in a way that it is different from the one in the new package, install the new file to different location
+                        log::info!(
+                            "sum for file {target_fn} changed, installing new version as {target_fn}.atxpkg_new"
+                        );
+                        progress_bar.println(format!(
+                            "sum for file {target_fn} changed, installing new version as {target_fn}.atxpkg_new"
+                        ));
+                        target_fn += ".atxpkg_new";
+                    }
+                }
+                */
+                /*
+                if sum_original == &sum_new {
+                    // file not changed between package versions - leave the file currently on disk as is - the user may or may not have altered it
+                    log::debug!("S {target_fn}");
+                    continue;
+                }
+                if &sum_current == &sum_new {
+                    // file changed between package versions but the current on-disk version is the same as the one that is just to be installed so it does not really matter if we overwrite it or not - leave the on-disk version
+                    continue;
+                }
+                if sum_original != &sum_current {
+                    // user altered the file
+                    // file changed between package versions but the on-disk file does not match the to-be-installed version - let's not overwrite user's altered file and let's install the new version "next" to it
+                    log::info!(
+                        "sum for file {target_fn} changed, installing new version as {target_fn}.atxpkg_new"
+                    );
+                    progress_bar.println(format!(
+                        "sum for file {target_fn} changed, installing new version as {target_fn}.atxpkg_new"
+                    ));
+                    target_fn += ".atxpkg_new";
+                }
+                */
             }
         }
+        log::debug!("UF {target_fn}");
         move_file(&format!("{tmp_dir_path}/{f}"), &target_fn)?;
-        /*
-        // TODO: do we really need to delete here? can't we just overwrite?
-        try_delete(&target_fn)?;
-        // TODO: rename instead of copy+remove?
-        std::fs::copy(&format!("{tmp_dir_path}/{f}"), &target_fn)?;
-        // no need for remove, really, since the whole tmp dir will be removed eventually
-        // but i'm doing this to be sure that we don't need that much extra disk space
-        std::fs::remove_file(format!("{tmp_dir_path}/{f}"))?;
-        */
     }
 
     progress_bar.finish();
 
-    let mut dirs_old = vec![];
-    let mut files_old = vec![];
+    let (mut dirs_old, mut files_old) = (vec![], vec![]);
     for (fn_or_dir_old, md5sum_old) in installed_package.md5sums.into_iter() {
         if let Some(md5sum_old) = md5sum_old {
             files_old.push((fn_or_dir_old, md5sum_old));
@@ -940,7 +930,7 @@ pub fn update_package(
     );
 
     for (fn_old, md5sum_old) in progress_bar.wrap_iter(files_old.into_iter()) {
-        if ret.md5sums.contains_key(&fn_old) {
+        if md5sums.contains_key(&fn_old) {
             continue;
         }
         let target_fn = format!("{prefix}/{fn_old}");
@@ -956,9 +946,15 @@ pub fn update_package(
         {
             let sum_current = get_md5_sum(&target_fn)?;
             if sum_current != *md5sum_old {
+                // this file is not in the new version of package but user has altered it - keep a copy
                 log::info!("saving changed {target_fn} as {target_fn}.atxpkg_save");
-                println!("saving changed {target_fn} as {target_fn}.atxpkg_save",);
-                std::fs::rename(&target_fn, format!("{target_fn}.atxpkg_save"))?;
+                progress_bar.println(format!(
+                    "saving changed {target_fn} as {target_fn}.atxpkg_save"
+                ));
+                move_file(&target_fn, &format!("{target_fn}.atxpkg_save"))?;
+            } else {
+                log::debug!("DF {target_fn}");
+                try_delete(&target_fn)?;
             }
         } else {
             log::debug!("DF {target_fn}");
@@ -967,7 +963,7 @@ pub fn update_package(
     }
 
     for dir_name in progress_bar.wrap_iter(dirs_old.into_iter().sorted_by_key(|x| x.len()).rev()) {
-        if ret.md5sums.contains_key(&dir_name) {
+        if md5sums.contains_key(&dir_name) {
             continue;
         }
 
@@ -988,7 +984,12 @@ pub fn update_package(
 
     progress_bar.finish();
 
-    Ok(ret)
+    Ok(InstalledPackage {
+        t: Some(UNIX_EPOCH.elapsed().unwrap().as_secs_f64()),
+        version: version_new.clone(),
+        md5sums,
+        backup,
+    })
 }
 
 pub fn remove_packages(
@@ -1026,7 +1027,11 @@ pub fn remove_packages(
 
     for p in &packages {
         let package_name = get_package_name(p);
-        remove_package(&package_name, &installed_packages, prefix)?;
+        remove_package(
+            &package_name,
+            installed_packages[&package_name].clone(),
+            prefix,
+        )?;
         installed_packages.remove(&package_name);
     }
 
@@ -1035,22 +1040,20 @@ pub fn remove_packages(
 
 pub fn remove_package(
     package_name: &str,
-    installed_packages: &HashMap<String, InstalledPackage>,
+    installed_package: InstalledPackage,
     prefix: &str,
 ) -> anyhow::Result<()> {
-    let version = &installed_packages[package_name].version;
+    let version = &installed_package.version;
     log::info!("removing {package_name}-{version}");
-    let package_info = &installed_packages[package_name];
 
     let progress_bar = make_progress_bar(
-        package_info.md5sums.len().try_into()?,
+        installed_package.md5sums.len().try_into()?,
         package_name,
         "{spinner} {prefix}: remove [{wide_bar}] {pos}/{len}",
     );
 
-    let mut dirs = vec![];
-    let mut files = vec![];
-    for (file_or_dir_name, md5sum) in package_info.md5sums.iter() {
+    let (mut dirs, mut files) = (vec![], vec![]);
+    for (file_or_dir_name, md5sum) in installed_package.md5sums.iter() {
         if let Some(md5sum) = md5sum {
             files.push((file_or_dir_name, md5sum.clone()));
         } else {
@@ -1065,8 +1068,7 @@ pub fn remove_package(
             continue;
         }
 
-        let mut backup = false;
-        if package_info
+        if installed_package
             .backup
             .clone()
             .unwrap_or_default()
@@ -1074,23 +1076,26 @@ pub fn remove_package(
         {
             let current_sum = get_md5_sum(&target_fn)?;
             if current_sum != *md5sum {
-                backup = true;
+                log::info!("{target_fn} changed, saving as {target_fn}.atxpkg_backup");
+                progress_bar.println(format!(
+                    "{target_fn} changed, saving as {target_fn}.atxpkg_backup"
+                ));
+                move_file(&target_fn, &format!("{target_fn}.atxpkg_backup"))?;
+            } else {
+                log::debug!("DF {target_fn}");
+                try_delete(&target_fn)?;
             }
-        }
-
-        if backup {
-            log::info!("{target_fn} changed, saving as {target_fn}.atxpkg_backup");
-            println!("{target_fn} changed, saving as {target_fn}.atxpkg_backup");
-            std::fs::rename(&target_fn, format!("{target_fn}.atxpkg_backup"))?;
         } else {
             log::debug!("DF {target_fn}");
             try_delete(&target_fn)?;
         }
     }
+
     for dir_name in dirs.into_iter().sorted_by_key(|x| x.len()).rev() {
         let target_fn = format!("{prefix}/{dir_name}");
         if !Path::new(&target_fn).exists() {
             log::warn!("{target_fn} does not exist!");
+            progress_bar.println(format!("{target_fn} does not exist!"));
             continue;
         }
 
@@ -1102,7 +1107,9 @@ pub fn remove_package(
             }
         }
     }
+
     progress_bar.finish();
+
     Ok(())
 }
 
@@ -1278,6 +1285,8 @@ pub fn update_packages(
 }
 
 fn check_package(package_name: &str, pkg: &InstalledPackage, prefix: &str) -> anyhow::Result<u32> {
+    let mut res = vec![];
+
     let progress_bar = make_progress_bar(
         pkg.md5sums.len().try_into()?,
         package_name,
@@ -1288,7 +1297,7 @@ fn check_package(package_name: &str, pkg: &InstalledPackage, prefix: &str) -> an
     for (fn_name, md5sum) in progress_bar.wrap_iter(pkg.md5sums.iter()) {
         let file_path = format!("{prefix}/{fn_name}");
         if !Path::new(&file_path).exists() {
-            println!("{package_name}: does not exist: {file_path}");
+            res.push(format!("{package_name}: does not exist: {file_path}"));
             err_count += 1;
         }
         if let Some(md5sum) = md5sum {
@@ -1297,7 +1306,7 @@ fn check_package(package_name: &str, pkg: &InstalledPackage, prefix: &str) -> an
             }
             if let Ok(current_md5sum) = get_md5_sum(&file_path) {
                 if current_md5sum != *md5sum {
-                    println!("{package_name}: checksum difference: {file_path}");
+                    res.push(format!("{package_name}: checksum difference: {file_path}"));
                     err_count += 1;
                 }
             }
@@ -1305,6 +1314,10 @@ fn check_package(package_name: &str, pkg: &InstalledPackage, prefix: &str) -> an
     }
 
     progress_bar.finish();
+
+    for r in res {
+        println!("{r}");
+    }
 
     Ok(err_count)
 }
@@ -1408,6 +1421,18 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_get_max_version() {
+        assert_eq!(
+            get_max_version(vec![
+                "http://atxpkg.asterix.cz/neco.dev-20240722223041-1.atxpkg.zip".to_string(),
+                "http://atxpkg-dev.asterix.cz/neco.dev-20240722223042-1.atxpkg.zip".to_string(),
+                "/neco/na/disku/neco.dev-20240722223043-1.atxpkg.zip".to_string(),
+            ]),
+            Some("20240722223043-1".to_string())
+        )
+    }
+
+    #[test]
     fn test_get_recursive_listing() {
         let tmp_dir = tempfile::Builder::new().tempdir().unwrap();
         let tmp_dir_str = tmp_dir.path().to_str().unwrap();
@@ -1450,7 +1475,7 @@ mod tests {
     }
 
     #[test]
-    fn test_update_package_with_conflict() {
+    fn test_install_update_package_with_conflict() {
         let dest_dir = tempfile::Builder::new().tempdir().unwrap();
         let dest_dir_str = dest_dir.path().to_str().unwrap();
         let tmp_dir = tempfile::Builder::new().tempdir().unwrap();
@@ -1479,7 +1504,7 @@ mod tests {
     }
 
     #[test]
-    fn test_update_package_with_backup() {
+    fn test_install_update_package_with_backup() {
         let dest_dir = tempfile::Builder::new().tempdir().unwrap();
         let dest_dir_str = dest_dir.path().to_str().unwrap();
         let tmp_dir = tempfile::Builder::new().tempdir().unwrap();
@@ -1517,7 +1542,7 @@ mod tests {
     }
 
     #[test]
-    fn test_update_remove_with_backup() {
+    fn test_install_remove_with_backup() {
         let dest_dir = tempfile::Builder::new().tempdir().unwrap();
         let dest_dir_str = dest_dir.path().to_str().unwrap();
         let tmp_dir = tempfile::Builder::new().tempdir().unwrap();
@@ -1536,10 +1561,7 @@ mod tests {
         std::fs::write(format!("{dest_dir_str}/test/protected2"), "2\n").unwrap();
         std::fs::write(format!("{dest_dir_str}/test/unprotected2"), "2\n").unwrap();
 
-        let mut installed_packages: HashMap<String, InstalledPackage> = HashMap::new();
-        installed_packages.insert("test".to_string(), pkginfo);
-
-        let _ = remove_package("test", &installed_packages, dest_dir_str).unwrap();
+        let _ = remove_package("test", pkginfo, dest_dir_str).unwrap();
 
         assert!(Path::new(&format!("{dest_dir_str}/test/protected1.atxpkg_backup")).exists());
         assert!(Path::new(&format!("{dest_dir_str}/test/protected2.atxpkg_backup")).exists());
