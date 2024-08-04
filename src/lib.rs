@@ -936,6 +936,7 @@ pub fn update_package(
         let target_fn = format!("{prefix}/{fn_old}");
         if !Path::new(&target_fn).exists() {
             log::warn!("file {target_fn} does not exist");
+            progress_bar.println(format!("file {target_fn} does not exist!"));
             continue;
         }
         if installed_package
@@ -970,14 +971,15 @@ pub fn update_package(
         let target_fn = format!("{prefix}/{dir_name}");
         if !Path::new(&target_fn).exists() {
             log::warn!("dir {target_fn} does not exist");
+            progress_bar.println(format!("{target_fn} does not exist!"));
             continue;
         }
 
-        let dir_name = Path::new(&target_fn);
-        if dir_name != Path::new(&prefix) {
-            if is_empty_dir(dir_name)? {
-                log::debug!("DD {}", as_unix_path(dir_name));
-                std::fs::remove_dir(dir_name)?;
+        let dir_path = Path::new(&target_fn);
+        if dir_path != Path::new(&prefix) {
+            if is_empty_dir(dir_path)? {
+                log::debug!("DD {target_fn}");
+                std::fs::remove_dir(dir_path)?;
             }
         }
     }
@@ -1046,12 +1048,6 @@ pub fn remove_package(
     let version = &installed_package.version;
     log::info!("removing {package_name}-{version}");
 
-    let progress_bar = make_progress_bar(
-        installed_package.md5sums.len().try_into()?,
-        package_name,
-        "{spinner} {prefix}: remove [{wide_bar}] {pos}/{len}",
-    );
-
     let (mut dirs, mut files) = (vec![], vec![]);
     for (file_or_dir_name, md5sum) in installed_package.md5sums.iter() {
         if let Some(md5sum) = md5sum {
@@ -1061,10 +1057,17 @@ pub fn remove_package(
         }
     }
 
-    for (file_name, md5sum) in progress_bar.wrap_iter(files.iter()) {
+    let progress_bar = make_progress_bar(
+        (dirs.len() + files.len()).try_into()?,
+        package_name,
+        "{spinner} {prefix}: remove [{wide_bar}] {pos}/{len}",
+    );
+
+    for (file_name, md5sum) in progress_bar.wrap_iter(files.into_iter()) {
         let target_fn = format!("{prefix}/{file_name}");
         if !Path::new(&target_fn).exists() {
-            log::warn!("{target_fn} does not exist!");
+            log::warn!("file {target_fn} does not exist!");
+            progress_bar.println(format!("{target_fn} does not exist!"));
             continue;
         }
 
@@ -1091,19 +1094,19 @@ pub fn remove_package(
         }
     }
 
-    for dir_name in dirs.into_iter().sorted_by_key(|x| x.len()).rev() {
+    for dir_name in progress_bar.wrap_iter(dirs.into_iter().sorted_by_key(|x| x.len()).rev()) {
         let target_fn = format!("{prefix}/{dir_name}");
         if !Path::new(&target_fn).exists() {
-            log::warn!("{target_fn} does not exist!");
+            log::warn!("dir {target_fn} does not exist!");
             progress_bar.println(format!("{target_fn} does not exist!"));
             continue;
         }
 
-        let dir_name = Path::new(&target_fn);
-        if dir_name != Path::new(&prefix) {
-            if is_empty_dir(dir_name)? {
-                log::debug!("DD {}", as_unix_path(dir_name));
-                std::fs::remove_dir(dir_name)?;
+        let dir_path = Path::new(&target_fn);
+        if dir_path != Path::new(&prefix) {
+            if is_empty_dir(dir_path)? {
+                log::debug!("DD {target_fn}");
+                std::fs::remove_dir(dir_path)?;
             }
         }
     }
@@ -1419,6 +1422,14 @@ pub fn show_untracked(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_get_md5_sum() {
+        assert_eq!(
+            get_md5_sum("./test_data/atxpkg-1.5-3.atxpkg.zip").unwrap(),
+            "456e4527d437e2f3cbbe0e9311bc5a13"
+        )
+    }
 
     #[test]
     fn test_get_max_version() {
