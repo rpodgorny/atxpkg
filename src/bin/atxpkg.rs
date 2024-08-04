@@ -170,10 +170,7 @@ fn main_sub() -> anyhow::Result<()> {
         return Err(anyhow::anyhow!("root dir {root_dir} does not exist"));
     }
     if !Path::new(&mainargs.prefix).exists() {
-        return Err(anyhow::anyhow!(
-            "prefix dir {} does not exist",
-            &mainargs.prefix
-        ));
+        anyhow::bail!("prefix dir {} does not exist", &mainargs.prefix);
     }
 
     let cache_dir = format!("{root_dir}/cache");

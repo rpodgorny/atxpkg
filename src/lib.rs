@@ -4,7 +4,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
-use std::io::{BufRead, BufReader, IsTerminal, Read, Write};
+use std::io::{BufRead, BufReader, BufWriter, IsTerminal, Read, Write};
 use std::path::Path;
 use std::time::{Duration, UNIX_EPOCH};
 
@@ -261,10 +261,7 @@ fn download_package_if_needed(
 
     let resp = req.send()?;
     if !resp.status().is_success() {
-        return Err(anyhow::anyhow!(
-            "Failed to download file: {}",
-            resp.status()
-        ));
+        anyhow::bail!("Failed to download file: {}", resp.status());
     };
 
     let size_to_download = resp.content_length().unwrap_or(0);
@@ -279,9 +276,7 @@ fn download_package_if_needed(
         reader = Box::new(pb.wrap_read(reader));
     }
 
-    let mut writer = std::io::BufWriter::new(f);
-    std::io::copy(&mut reader, &mut writer)?;
-    writer.flush()?;
+    std::io::copy(&mut reader, &mut BufWriter::new(f))?;
 
     if let Some(pb) = progress_bar {
         pb.finish();
@@ -347,7 +342,7 @@ pub fn list_available(
                     ret.push((p.clone(), version.clone()));
                 }
             } else {
-                return Err(anyhow::anyhow!("package {p} not available"));
+                anyhow::bail!("package {p} not available");
             }
         }
     }
@@ -393,12 +388,10 @@ pub fn if_installed(
         let (package_name, package_version) = split_package_name_version(&p);
         if let Some(installed_package) = installed_packages.get(&package_name) {
             if !package_version.is_empty() && package_version != installed_package.version {
-                return Err(anyhow::anyhow!(
-                    "package {package_name}-{package_version} not installed"
-                ));
+                anyhow::bail!("package {package_name}-{package_version} not installed");
             }
         } else {
-            return Err(anyhow::anyhow!("package {package_name} not installed"));
+            anyhow::bail!("package {package_name} not installed");
         }
     }
     Ok(())
@@ -439,15 +432,11 @@ pub fn install_packages(
 
     for p in &packages {
         let package_name = get_package_name(p);
-        if installed_packages.contains_key(&package_name) {
-            if !force && !download_only {
-                return Err(anyhow::anyhow!("package {package_name} already installed"));
-            }
+        if installed_packages.contains_key(&package_name) && !force && !download_only {
+            anyhow::bail!("package {package_name} already installed");
         }
         if !available_packages.contains_key(&package_name) {
-            return Err(anyhow::anyhow!(
-                "unable to find url for package {package_name}"
-            ));
+            anyhow::bail!("unable to find url for package {package_name}");
         }
     }
 
@@ -678,31 +667,21 @@ fn install_package(
 
 fn get_md5_sum(file_path: &str) -> anyhow::Result<String> {
     let mut hasher = Md5::new();
-    let mut buffer = Vec::with_capacity(1024 * 1024);
-
-    // TODO: would a buffered reader speed things up?
-    //let mut reader = BufReader::new(&file);
-    // TODO: not a good idea to read the entire file to memory
-    File::open(file_path)?.read_to_end(&mut buffer)?;
-    hasher.update(&buffer);
-
-    // BROKEN
-    /*while let Ok(size) = reader.read(&mut buffer) {
+    let mut buffer = [0u8; 1024 * 1024];
+    let mut reader = BufReader::new(File::open(file_path)?);
+    while let Ok(size) = reader.read(&mut buffer) {
+        hasher.update(&buffer[..size]);
         if size == 0 {
             break;
         }
-        hasher.update(&buffer[..size]);
-    }*/
-
-    let hash = hasher.finalize();
-    Ok(hex::encode(hash))
+    }
+    Ok(hex::encode(hasher.finalize()))
 }
 
 fn unzip_to(zip_file: &str, output_dir: &str, progress_bar_prefix: &str) -> anyhow::Result<()> {
     log::debug!("unzip {zip_file} to {output_dir}");
 
-    // TODO: would buffered reader speed things up? - it seems ziparchive takes unbuffered file as input
-    let mut archive = zip::read::ZipArchive::new(File::open(zip_file)?)?;
+    let mut archive = zip::read::ZipArchive::new(BufReader::new(File::open(zip_file)?))?;
 
     let progress_bar = make_progress_bar(
         archive.len().try_into()?,
@@ -723,8 +702,7 @@ fn unzip_to(zip_file: &str, output_dir: &str, progress_bar_prefix: &str) -> anyh
                     std::fs::create_dir_all(p)?;
                 }
             }
-            let mut outfile = File::create(&outpath)?;
-            std::io::copy(&mut file, &mut outfile)?;
+            std::io::copy(&mut file, &mut File::create(&outpath)?)?;
         }
 
         #[cfg(unix)]
@@ -816,9 +794,7 @@ pub fn update_package(
             let target_fn = format!("{prefix}/{f}");
             if Path::new(&target_fn).exists() {
                 if !installed_package.md5sums.contains_key(f) {
-                    return Err(anyhow::anyhow!(
-                        "{f} already exists but is not part of original package"
-                    ));
+                    anyhow::bail!("{f} already exists but is not part of original package");
                 }
             }
         }
@@ -856,7 +832,7 @@ pub fn update_package(
             if let Some(Some(sum_original)) = installed_package.md5sums.get(&f) {
                 let sum_current = get_md5_sum(&target_fn)?;
                 // only if the user has altered the file and it's altered in a way that it is not the same as the to-be-installed version - only then install the new file to different location
-                if sum_original != &sum_current && &sum_current != &sum_new {
+                if sum_original != &sum_current && sum_current != sum_new {
                     // user has altered the file in a way that it is different from the one in the new package, install the new file to different location
                     log::info!(
                         "sum for file {target_fn} changed, installing new version as {target_fn}.atxpkg_new"
@@ -976,11 +952,9 @@ pub fn update_package(
         }
 
         let dir_path = Path::new(&target_fn);
-        if dir_path != Path::new(&prefix) {
-            if is_empty_dir(dir_path)? {
-                log::debug!("DD {target_fn}");
-                std::fs::remove_dir(dir_path)?;
-            }
+        if dir_path != Path::new(&prefix) && is_empty_dir(dir_path)? {
+            log::debug!("DD {target_fn}");
+            std::fs::remove_dir(dir_path)?;
         }
     }
 
@@ -1010,9 +984,7 @@ pub fn remove_packages(
         let installed_package = installed_package.unwrap();
         if !package_version.is_empty() {
             if package_version != installed_package.version {
-                return Err(anyhow::anyhow!(
-                    "package {package_name}-{package_version} not installed"
-                ));
+                anyhow::bail!("package {package_name}-{package_version} not installed");
             }
         } else {
             package_version = installed_package.version.clone();
@@ -1103,11 +1075,9 @@ pub fn remove_package(
         }
 
         let dir_path = Path::new(&target_fn);
-        if dir_path != Path::new(&prefix) {
-            if is_empty_dir(dir_path)? {
-                log::debug!("DD {target_fn}");
-                std::fs::remove_dir(dir_path)?;
-            }
+        if dir_path != Path::new(&prefix) && is_empty_dir(dir_path)? {
+            log::debug!("DD {target_fn}");
+            std::fs::remove_dir(dir_path)?;
         }
     }
 
@@ -1169,11 +1139,7 @@ pub fn update_packages(
             return Err(anyhow::anyhow!("package {} not installed", pu.name_old));
         };
         if !pu.version_old.is_empty() && pu.version_old != installed_package.version {
-            return Err(anyhow::anyhow!(
-                "package {}-{} not installed",
-                pu.name_old,
-                pu.version_old
-            ));
+            anyhow::bail!("package {}-{} not installed", pu.name_old, pu.version_old);
         }
 
         if pu.version_old.is_empty() {
@@ -1199,11 +1165,7 @@ pub fn update_packages(
         let url =
             get_specific_version_url(available_packages[&pu.name_new].clone(), &pu.version_new);
         if url.clone().unwrap().is_empty() {
-            return Err(anyhow::anyhow!(
-                "package {}-{} not available",
-                pu.name_new,
-                pu.version_new
-            ));
+            anyhow::bail!("package {}-{} not available", pu.name_new, pu.version_new);
         }
         pu.url = url.unwrap();
     }
