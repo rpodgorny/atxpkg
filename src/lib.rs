@@ -4,7 +4,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
-use std::io::{BufRead, BufReader, BufWriter, IsTerminal, Read, Write};
+use std::io::{BufReader, BufWriter, IsTerminal, Read, Write};
 use std::path::Path;
 use std::time::{Duration, UNIX_EPOCH};
 
@@ -987,7 +987,7 @@ pub fn remove_packages(
                 anyhow::bail!("package {package_name}-{package_version} not installed");
             }
         } else {
-            package_version = installed_package.version.clone();
+            package_version.clone_from(&installed_package.version);
         }
 
         println!("remove {package_name}-{package_version}");
@@ -1047,7 +1047,7 @@ pub fn remove_package(
             .backup
             .clone()
             .unwrap_or_default()
-            .contains(&file_name)
+            .contains(file_name)
         {
             let current_sum = get_md5_sum(&target_fn)?;
             if current_sum != *md5sum {
@@ -1143,7 +1143,7 @@ pub fn update_packages(
         }
 
         if pu.version_old.is_empty() {
-            pu.version_old = installed_package.version.clone();
+            pu.version_old.clone_from(&installed_package.version);
         }
 
         if pu.name_old != pu.name_new && installed_packages.contains_key(&pu.name_new) {
