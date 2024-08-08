@@ -633,7 +633,7 @@ fn install_package(
 
     for d in progress_bar.wrap_iter(dirs.into_iter().sorted_by_key(|x| x.len())) {
         let target_dir = format!("{prefix}/{d}");
-        log::debug!("ID {d}");
+        log::trace!("ID {d}");
         if !Path::new(&target_dir).exists() {
             std::fs::create_dir(&target_dir)?;
         }
@@ -659,7 +659,7 @@ fn install_package(
             });
             move_file(&target_fn, &format!("{target_fn}.atxpkg_save"))?;
         }
-        log::debug!("IF {target_fn}");
+        log::trace!("IF {target_fn}");
         move_file(&format!("{tmp_dir_path}/{f}"), &target_fn)?;
     }
 
@@ -820,7 +820,7 @@ pub fn update_package(
 
     for d in progress_bar.wrap_iter(dirs.into_iter().sorted()) {
         let target_dir = format!("{prefix}/{d}");
-        log::debug!("UD {target_dir}");
+        log::trace!("UD {target_dir}");
         if !Path::new(&target_dir).exists() {
             std::fs::create_dir(&target_dir)?;
         }
@@ -874,7 +874,7 @@ pub fn update_package(
                 /*
                 if sum_original == &sum_new {
                     // file not changed between package versions - leave the file currently on disk as is - the user may or may not have altered it
-                    log::debug!("S {target_fn}");
+                    log::trace!("S {target_fn}");
                     continue;
                 }
                 if &sum_current == &sum_new {
@@ -895,7 +895,7 @@ pub fn update_package(
                 */
             }
         }
-        log::debug!("UF {target_fn}");
+        log::trace!("UF {target_fn}");
         move_file(&format!("{tmp_dir_path}/{f}"), &target_fn)?;
     }
 
@@ -945,11 +945,11 @@ pub fn update_package(
                 });
                 move_file(&target_fn, &format!("{target_fn}.atxpkg_save"))?;
             } else {
-                log::debug!("DF {target_fn}");
+                log::trace!("DF {target_fn}");
                 try_delete(&target_fn)?;
             }
         } else {
-            log::debug!("DF {target_fn}");
+            log::trace!("DF {target_fn}");
             try_delete(&target_fn)?;
         }
     }
@@ -969,7 +969,7 @@ pub fn update_package(
 
         let dir_path = Path::new(&target_fn);
         if dir_path != Path::new(&prefix) && is_empty_dir(dir_path)? {
-            log::debug!("DD {target_fn}");
+            log::trace!("DD {target_fn}");
             std::fs::remove_dir(dir_path)?;
         }
     }
@@ -1077,11 +1077,11 @@ pub fn remove_package(
                 });
                 move_file(&target_fn, &format!("{target_fn}.atxpkg_backup"))?;
             } else {
-                log::debug!("DF {target_fn}");
+                log::trace!("DF {target_fn}");
                 try_delete(&target_fn)?;
             }
         } else {
-            log::debug!("DF {target_fn}");
+            log::trace!("DF {target_fn}");
             try_delete(&target_fn)?;
         }
     }
@@ -1097,7 +1097,7 @@ pub fn remove_package(
 
         let dir_path = Path::new(&target_fn);
         if dir_path != Path::new(&prefix) && is_empty_dir(dir_path)? {
-            log::debug!("DD {target_fn}");
+            log::trace!("DD {target_fn}");
             std::fs::remove_dir(dir_path)?;
         }
     }
