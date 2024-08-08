@@ -31,6 +31,8 @@ fn as_unix_path(pth: &Path) -> String {
         .components()
         .map(|x| x.as_os_str().to_string_lossy())
         .join("/");
+    // TODO: this used to fuck up things for windows - investigate and fix
+    #[cfg(target_os = "linux")]
     if pth.is_absolute() {
         ret = format!("/{ret}");
     }
@@ -161,6 +163,9 @@ fn get_repo_listing_http(url: &str, unverified_ssl: bool) -> anyhow::Result<Vec<
         .danger_accept_invalid_certs(unverified_ssl)
         .build()?;
     let mut response = client.get(url).send()?;
+    if !response.status().is_success() {
+        anyhow::bail!("Failed to download listing: {}", response.status());
+    };
 
     let total_size = response.content_length().unwrap_or(0);
 
@@ -176,13 +181,13 @@ fn get_repo_listing_http(url: &str, unverified_ssl: bool) -> anyhow::Result<Vec<
         .wrap_read(response.by_ref())
         .read_to_string(&mut body)?;
 
+    progress_bar.finish();
+
     let re = lazy_regex::regex!(r"[\w\-\._:/]+\.atxpkg\.\w+");
     let files: Vec<String> = re
         .find_iter(&body)
-        .map(|mat| format!("{url}/{}", mat.as_str()))
+        .map(|x| format!("{url}/{}", x.as_str()))
         .collect();
-
-    progress_bar.finish();
 
     Ok(files)
 }
@@ -646,9 +651,12 @@ fn install_package(
         let target_fn = format!("{prefix}/{f}");
         if Path::new(&target_fn).exists() && backup.clone().unwrap_or_default().contains(&f) {
             log::info!("saving untracked {target_fn} as {target_fn}.atxpkg_save");
-            progress_bar.println(format!(
-                "saving untracked {target_fn} as {target_fn}.atxpkg_save"
-            ));
+            //progress_bar.println(format!(
+            //    "saving untracked {target_fn} as {target_fn}.atxpkg_save"
+            //));
+            progress_bar.suspend(|| {
+                eprintln!("saving untracked {target_fn} as {target_fn}.atxpkg_save");
+            });
             move_file(&target_fn, &format!("{target_fn}.atxpkg_save"))?;
         }
         log::debug!("IF {target_fn}");
@@ -837,9 +845,12 @@ pub fn update_package(
                     log::info!(
                         "sum for file {target_fn} changed, installing new version as {target_fn}.atxpkg_new"
                     );
-                    progress_bar.println(format!(
-                        "sum for file {target_fn} changed, installing new version as {target_fn}.atxpkg_new\n"
-                    ));
+                    //progress_bar.println(format!(
+                    //    "sum for file {target_fn} changed, installing new version as {target_fn}.atxpkg_new"
+                    //));
+                    progress_bar.suspend(|| {
+                        eprintln!("sum for file {target_fn} changed, installing new version as {target_fn}.atxpkg_new");
+                    });
                     target_fn += ".atxpkg_new";
                 }
                 /*
@@ -912,7 +923,8 @@ pub fn update_package(
         let target_fn = format!("{prefix}/{fn_old}");
         if !Path::new(&target_fn).exists() {
             log::warn!("file {target_fn} does not exist");
-            progress_bar.println(format!("file {target_fn} does not exist!"));
+            //progress_bar.println(format!("file {target_fn} does not exist!"));
+            progress_bar.suspend(|| eprintln!("file {target_fn} does not exist!"));
             continue;
         }
         if installed_package
@@ -925,9 +937,12 @@ pub fn update_package(
             if sum_current != *md5sum_old {
                 // this file is not in the new version of package but user has altered it - keep a copy
                 log::info!("saving changed {target_fn} as {target_fn}.atxpkg_save");
-                progress_bar.println(format!(
-                    "saving changed {target_fn} as {target_fn}.atxpkg_save"
-                ));
+                //progress_bar.println(format!(
+                //    "saving changed {target_fn} as {target_fn}.atxpkg_save"
+                //));
+                progress_bar.suspend(|| {
+                    eprintln!("saving changed {target_fn} as {target_fn}.atxpkg_save");
+                });
                 move_file(&target_fn, &format!("{target_fn}.atxpkg_save"))?;
             } else {
                 log::debug!("DF {target_fn}");
@@ -947,7 +962,8 @@ pub fn update_package(
         let target_fn = format!("{prefix}/{dir_name}");
         if !Path::new(&target_fn).exists() {
             log::warn!("dir {target_fn} does not exist");
-            progress_bar.println(format!("{target_fn} does not exist!"));
+            //progress_bar.println(format!("{target_fn} does not exist!"));
+            progress_bar.suspend(|| eprintln!("{target_fn} does not exist!"));
             continue;
         }
 
@@ -1039,7 +1055,8 @@ pub fn remove_package(
         let target_fn = format!("{prefix}/{file_name}");
         if !Path::new(&target_fn).exists() {
             log::warn!("file {target_fn} does not exist!");
-            progress_bar.println(format!("{target_fn} does not exist!"));
+            //progress_bar.println(format!("{target_fn} does not exist!"));
+            progress_bar.suspend(|| eprintln!("{target_fn} does not exist!"));
             continue;
         }
 
@@ -1052,9 +1069,12 @@ pub fn remove_package(
             let current_sum = get_md5_sum(&target_fn)?;
             if current_sum != *md5sum {
                 log::info!("{target_fn} changed, saving as {target_fn}.atxpkg_backup");
-                progress_bar.println(format!(
-                    "{target_fn} changed, saving as {target_fn}.atxpkg_backup"
-                ));
+                //progress_bar.println(format!(
+                //    "{target_fn} changed, saving as {target_fn}.atxpkg_backup"
+                //));
+                progress_bar.suspend(|| {
+                    format!("{target_fn} changed, saving as {target_fn}.atxpkg_backup");
+                });
                 move_file(&target_fn, &format!("{target_fn}.atxpkg_backup"))?;
             } else {
                 log::debug!("DF {target_fn}");
@@ -1070,7 +1090,8 @@ pub fn remove_package(
         let target_fn = format!("{prefix}/{dir_name}");
         if !Path::new(&target_fn).exists() {
             log::warn!("dir {target_fn} does not exist!");
-            progress_bar.println(format!("{target_fn} does not exist!"));
+            //progress_bar.println(format!("{target_fn} does not exist!"));
+            progress_bar.suspend(|| eprintln!("{target_fn} does not exist!"));
             continue;
         }
 
