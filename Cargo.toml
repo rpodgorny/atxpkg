@@ -5,28 +5,30 @@ edition = "2021"
 
 [dependencies]
 anyhow = { version = "1.0.86", features = ["backtrace"] }
-clap = { version = "4.5.13", features = ["derive"] }
-filetime = "0.2.23"
+clap = { version = "4.5.16", features = ["derive"] }
+filetime = "0.2.24"
 glob = "0.3.1"
 hex = "0.4.3"
 indicatif = "0.17.8"
 itertools = "0.13.0"
-lazy-regex = "3.2.0"
+lazy-regex = "3.3.0"
 log = "0.4.22"
 log-panics = { version = "2.1.0", features = ["with-backtrace"] }
 md-5 = "0.10.6"
 rayon = "1.10.0"
-reqwest = { version = "0.12.5", features = ["blocking", "native-tls-vendored", "rustls-tls"] }
-serde = { version = "1.0.205", features = ["derive"] }
-serde_json = "1.0.122"
+reqwest = { version = "0.12.7", features = ["blocking", "native-tls-vendored", "rustls-tls"] }
+serde = { version = "1.0.209", features = ["derive"] }
+serde_json = "1.0.127"
 simplelog = "0.12.2"
 tempfile = "3.12.0"
 time = { version = "0.3.36", features = ["local-offset", "macros"] }
 walkdir = "2.5.0"
-zip = { version = "2.1.6", features = ["time"] }
+zip = { version = "2.2.0", features = ["time"] }
 
-# TODO: i still can't figure out how to only include debug info for my own code
-#[profile.release]
-#debug = true
 #[profile.release.package."*"]
 #debug = false
+#strip = true
+
+[profile.release]
+debug = true
+#strip = false
