@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{path::Path, process::ExitCode};
 
 use atxpkg::*;
 use clap::{Args, Parser, Subcommand};
@@ -149,7 +149,9 @@ fn log_init(fn_: Option<&str>, level: Option<&str>, show: bool) -> anyhow::Resul
     Ok(())
 }
 
-fn main_sub() -> anyhow::Result<()> {
+fn main_sub() -> anyhow::Result<u8> {
+    std::env::set_var("RUST_BACKTRACE", "1");
+
     let mainargs = MainArgs::parse();
 
     #[cfg(target_os = "linux")]
@@ -202,15 +204,11 @@ fn main_sub() -> anyhow::Result<()> {
     match &mainargs.command {
         Command::Install(args) => {
             if let Some(if_installed_) = &args.if_installed {
-                if let Err(err) = if_installed(
+                if_installed(
                     if_installed_.split(',').map(|x| x.to_string()).collect(),
                     &installed_packages,
-                ) {
-                    log::error!("Error checking if installed: {err}");
-                    return Err(anyhow::anyhow!("IfInstalled error"));
-                }
+                )?;
             }
-
             let new_installed_packages = install_packages(
                 args.packages.to_vec(),
                 &installed_packages,
@@ -226,15 +224,18 @@ fn main_sub() -> anyhow::Result<()> {
                 &tmp_dir_prefix,
             )?;
             if let Some(new_installed_packages) = new_installed_packages {
-                if let Err(err) = save_installed_packages(&new_installed_packages, &db_fn) {
-                    log::error!("Error saving installed packages: {:?}", err);
-                    return Err(anyhow::anyhow!("SaveInstalledPackages error"));
-                }
-                log::info!("install completed");
-                println!("install completed");
+                save_installed_packages(&new_installed_packages, &db_fn)?;
             }
+            log::info!("install completed");
+            println!("install completed");
         }
         Command::Update(args) => {
+            if let Some(if_installed_) = &args.if_installed {
+                if_installed(
+                    if_installed_.split(',').map(|x| x.to_string()).collect(),
+                    &installed_packages,
+                )?;
+            }
             let packages = if args.packages.is_empty() {
                 installed_packages.keys().map(|x| x.to_string()).collect()
             } else {
@@ -255,15 +256,18 @@ fn main_sub() -> anyhow::Result<()> {
                 &tmp_dir_prefix,
             )?;
             if let Some(new_installed_packages) = new_installed_packages {
-                if let Err(err) = save_installed_packages(&new_installed_packages, &db_fn) {
-                    log::error!("Error saving installed packages: {err}");
-                    return Err(anyhow::anyhow!("SaveInstalledPackages error"));
-                }
-                log::info!("update completed");
-                println!("update completed");
+                save_installed_packages(&new_installed_packages, &db_fn)?;
             }
+            log::info!("update completed");
+            println!("update completed");
         }
         Command::Remove(args) => {
+            if let Some(if_installed_) = &args.if_installed {
+                if_installed(
+                    if_installed_.split(',').map(|x| x.to_string()).collect(),
+                    &installed_packages,
+                )?;
+            }
             let new_installed_packages = remove_packages(
                 args.packages.to_vec(),
                 &installed_packages,
@@ -272,13 +276,10 @@ fn main_sub() -> anyhow::Result<()> {
                 args.no,
             )?;
             if let Some(new_installed_packages) = new_installed_packages {
-                if let Err(err) = save_installed_packages(&new_installed_packages, &db_fn) {
-                    log::error!("Error saving installed packages: {err}");
-                    return Err(anyhow::anyhow!("SaveInstalledPackages error"));
-                }
-                log::info!("remove completed");
-                println!("remove completed");
+                save_installed_packages(&new_installed_packages, &db_fn)?;
             }
+            log::info!("remove completed");
+            println!("remove completed");
         }
         Command::Check(args) => {
             let packages = if args.packages.is_empty() {
@@ -315,13 +316,15 @@ fn main_sub() -> anyhow::Result<()> {
         }
     }
 
-    Ok(())
+    Ok(0)
 }
 
-fn main() {
+fn main() -> ExitCode {
+    //ExitCode::from(main_sub().unwrap())
     let res = main_sub();
     if let Err(err) = &res {
-        eprintln!("Error: {err}");
+        eprintln!("{err}");
+        //eprintln!("{}", err.backtrace());
     }
-    res.unwrap();
+    ExitCode::from(res.unwrap())
 }

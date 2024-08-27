@@ -39,26 +39,19 @@ fn as_unix_path(pth: &Path) -> String {
     ret
 }
 
-// TODO: move to utils or something?
-// TODO: make this a macro
-// TODO: actually use this? ;-)
-pub fn prn(s: &str) {
-    if std::io::stdout().is_terminal() {
-        log::info!("{s}");
-        println!("{s}");
-    }
-}
-
 fn move_file(from: &str, to: &str) -> anyhow::Result<()> {
     // we try deletion first because the target file may be held onto by another process
     try_delete(to)?;
-    std::fs::rename(from, to)?;
-    // the following does a copy+delete instead of a rename - that should work across
-    // filesystems - should we ever need that
-    /*
-    std::fs::copy(from, to)?;
-    std::fs::remove_file(from)?;
-    */
+    if let Err(err) = std::fs::rename(from, to) {
+        if err.kind() == std::io::ErrorKind::Unsupported {
+            // probably different filesystem, retry with copy+remove method
+            std::fs::copy(from, to)?;
+            //std::fs::remove_file(from)?;
+            try_delete(from)?;
+        } else {
+            return Err(err.into());
+        }
+    }
     Ok(())
 }
 
@@ -78,10 +71,7 @@ pub fn get_installed_packages(db_fn: &str) -> anyhow::Result<HashMap<String, Ins
     if !Path::new(db_fn).exists() {
         return Ok(HashMap::new());
     }
-    let mut content = String::new();
-    File::open(db_fn)?.read_to_string(&mut content)?;
-    let installed_packages: HashMap<String, InstalledPackage> = serde_json::from_str(&content)?;
-    Ok(installed_packages)
+    Ok(serde_json::from_reader(File::open(db_fn)?)?)
 }
 
 pub fn save_installed_packages(
@@ -104,13 +94,11 @@ fn get_available_packages(
 ) -> HashMap<String, Vec<String>> {
     repos
         .into_par_iter()
+        .filter(|repo| !offline || !is_url(repo))
         .map(|repo| {
-            let subret = get_repo_listing(&repo, unverified_ssl)
+            get_repo_listing(&repo, unverified_ssl)
                 .into_iter()
                 .filter_map(|url| {
-                    if offline && is_url(&repo) {
-                        return None;
-                    }
                     let package_fn = get_package_fn(&url).unwrap();
                     if !is_valid_package_fn(&package_fn) {
                         log::warn!("{package_fn} not a valid package filename");
@@ -118,8 +106,8 @@ fn get_available_packages(
                     }
                     let package_name = get_package_name(&package_fn);
                     Some((package_name, url))
-                });
-            subret.collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>()
         })
         .flatten()
         .collect::<Vec<_>>()
@@ -183,11 +171,13 @@ fn get_repo_listing_http(url: &str, unverified_ssl: bool) -> anyhow::Result<Vec<
 
     progress_bar.finish();
 
-    let re = lazy_regex::regex!(r"[\w\-\._:/]+\.atxpkg\.\w+");
-    let files: Vec<String> = re
-        .find_iter(&body)
-        .map(|x| format!("{url}/{}", x.as_str()))
-        .collect();
+    let re = lazy_regex::regex!(r#"href\s*=\s*["']?([^"'\s>]+)["']?"#);
+    let files = re
+        .captures_iter(&body)
+        .map(|x| x.get(1).unwrap().as_str())
+        .filter(|x| x.ends_with(".atxpkg.zip"))
+        .map(|x| format!("{url}/{x}"))
+        .collect::<Vec<_>>();
 
     Ok(files)
 }
@@ -333,7 +323,10 @@ pub fn list_available(
     let available_packages = get_available_packages(repos, offline, unverified_ssl);
 
     if packages.is_empty() {
-        let mut keys: Vec<String> = available_packages.keys().map(|x| x.to_string()).collect();
+        let mut keys = available_packages
+            .keys()
+            .map(|x| x.to_string())
+            .collect::<Vec<_>>();
         keys.sort();
         keys.dedup();
         for k in keys {
@@ -341,13 +334,12 @@ pub fn list_available(
         }
     } else {
         for p in &packages {
-            if let Some(urls) = available_packages.get(p) {
-                for url in urls {
-                    let version = get_package_version(&get_package_fn(url).unwrap());
-                    ret.push((p.clone(), version.clone()));
-                }
-            } else {
+            let Some(urls) = available_packages.get(p) else {
                 anyhow::bail!("package {p} not available");
+            };
+            for url in urls {
+                let version = get_package_version(&get_package_fn(url).unwrap());
+                ret.push((p.clone(), version.clone()));
             }
         }
     }
@@ -368,7 +360,7 @@ fn split_package_name_version(pkg_spec: &str) -> (String, String) {
 }
 
 fn get_package_fn(url: &str) -> Option<String> {
-    let parts: Vec<String> = url.split('/').map(|x| x.to_string()).collect();
+    let parts = url.split('/').map(|x| x.to_string()).collect::<Vec<_>>();
     if parts.is_empty() {
         return None;
     }
@@ -565,7 +557,7 @@ fn get_max_version(urls: Vec<String>) -> Option<String> {
 
 fn split_ver(ver: &str) -> Vec<u64> {
     let regex = lazy_regex::regex!(r"[.-]");
-    let parts: Vec<_> = regex.split(ver).map(|x| x.to_string()).collect();
+    let parts = regex.split(ver).map(|x| x.to_string()).collect::<Vec<_>>();
     parts
         .into_iter()
         .map(|x| x.parse::<u64>().unwrap())
@@ -1129,7 +1121,7 @@ pub fn update_packages(
 
     for p in &packages {
         let pu = if p.contains("..") {
-            let package_parts: Vec<&str> = p.split("..").collect();
+            let package_parts = p.split("..").collect::<Vec<_>>();
             let (package_old, package_new) = (package_parts[0], package_parts[1]);
             let (package_name_old, package_version_old) = split_package_name_version(package_old);
             let (package_name_new, package_version_new) = split_package_name_version(package_new);
@@ -1357,16 +1349,18 @@ pub fn show_untracked(
 ) -> anyhow::Result<()> {
     let fn_to_package_name = gen_fn_to_package_name_mapping(installed_packages);
 
+    //anyhow::bail!("FAKE ERROR");
+
     let paths = if paths.is_empty() {
         let mut first_dirs = HashSet::new();
         for fn_ in fn_to_package_name.keys() {
-            let first_dir = Path::new(fn_).components().next().unwrap();
-            first_dirs.insert(first_dir);
+            if let Some((first_dir, _)) = fn_.split_once('/') {
+                first_dirs.insert(first_dir.to_string());
+            } else {
+                first_dirs.insert(fn_.to_string());
+            }
         }
-        let first_dirs = first_dirs
-            .into_iter()
-            .map(|x| x.as_os_str().to_str().unwrap().to_string())
-            .collect::<Vec<_>>();
+        let first_dirs = first_dirs.into_iter().collect::<Vec<_>>();
         log::debug!("first_dirs: {first_dirs:?}");
         first_dirs
     } else {
