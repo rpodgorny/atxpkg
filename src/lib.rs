@@ -68,6 +68,7 @@ fn make_progress_bar(len: u64, prefix: &str, template: &str) -> indicatif::Progr
 }
 
 pub fn get_installed_packages(db_fn: &str) -> anyhow::Result<HashMap<String, InstalledPackage>> {
+    log::debug!("getting installed packages from {db_fn}");
     if !Path::new(db_fn).exists() {
         return Ok(HashMap::new());
     }
@@ -78,12 +79,11 @@ pub fn save_installed_packages(
     installed_packages: &HashMap<String, InstalledPackage>,
     db_fn: &str,
 ) -> anyhow::Result<()> {
+    log::debug!("saving installed packages to {db_fn}");
     let mut f = File::create(db_fn)?;
-
     let encoder = serde_json::ser::PrettyFormatter::with_indent(b"  ");
     let mut ser = serde_json::Serializer::with_formatter(&mut f, encoder);
     installed_packages.serialize(&mut ser)?;
-
     Ok(())
 }
 
@@ -92,6 +92,7 @@ fn get_available_packages(
     offline: bool,
     unverified_ssl: bool,
 ) -> HashMap<String, Vec<String>> {
+    log::debug!("getting available packages from {repos:?}");
     repos
         .into_par_iter()
         .filter(|repo| !offline || !is_url(repo))
