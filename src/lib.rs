@@ -72,7 +72,7 @@ pub fn get_installed_packages(db_fn: &str) -> anyhow::Result<HashMap<String, Ins
     if !Path::new(db_fn).exists() {
         return Ok(HashMap::new());
     }
-    Ok(serde_json::from_reader(File::open(db_fn)?)?)
+    Ok(serde_json::from_reader(BufReader::new(File::open(db_fn)?))?)
 }
 
 pub fn save_installed_packages(
