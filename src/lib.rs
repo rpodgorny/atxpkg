@@ -1234,6 +1234,8 @@ pub fn update_packages(
         return Ok(None);
     }
 
+    // TODO: this is wrong. if some packages succeed and one fails, the resulted
+    // updated installed_packages list is not saved to filesystem
     for pu in package_updates {
         let mut package_info = update_package(
             &pu.local_fn,
