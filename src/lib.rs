@@ -704,7 +704,9 @@ fn unzip_to(zip_file: &str, output_dir: &str, progress_bar_prefix: &str) -> anyh
                     std::fs::create_dir_all(p)?;
                 }
             }
-            std::io::copy(&mut file, &mut File::create(&outpath)?)?;
+            let mut outf = BufWriter::new(File::create(&outpath)?);
+            std::io::copy(&mut file, &mut outf)?;
+            outf.flush()?;
         }
 
         #[cfg(unix)]
