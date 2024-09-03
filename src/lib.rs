@@ -273,7 +273,9 @@ fn download_package_if_needed(
         reader = Box::new(pb.wrap_read(reader));
     }
 
-    std::io::copy(&mut reader, &mut BufWriter::new(f))?;
+    let mut f = BufWriter::new(f);
+    std::io::copy(&mut reader, &mut f)?;
+    f.flush()?;
 
     if let Some(pb) = progress_bar {
         pb.finish();
