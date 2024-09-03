@@ -80,10 +80,11 @@ pub fn save_installed_packages(
     db_fn: &str,
 ) -> anyhow::Result<()> {
     log::debug!("saving installed packages to {db_fn}");
-    let mut f = File::create(db_fn)?;
+    let mut f = BufWriter::new(File::create(db_fn)?);
     let encoder = serde_json::ser::PrettyFormatter::with_indent(b"  ");
     let mut ser = serde_json::Serializer::with_formatter(&mut f, encoder);
     installed_packages.serialize(&mut ser)?;
+    f.flush()?;
     Ok(())
 }
 
