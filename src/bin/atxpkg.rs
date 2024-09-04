@@ -199,10 +199,9 @@ fn main_sub() -> anyhow::Result<u8> {
         }
     }
 
-    let installed_packages = get_installed_packages(&db_fn)?;
-
     match &mainargs.command {
         Command::Install(args) => {
+            let installed_packages = get_installed_packages(&db_fn)?;
             if let Some(if_installed_) = &args.if_installed {
                 if_installed(
                     if_installed_.split(',').map(|x| x.to_string()).collect(),
@@ -230,6 +229,7 @@ fn main_sub() -> anyhow::Result<u8> {
             println!("install completed");
         }
         Command::Update(args) => {
+            let installed_packages = get_installed_packages(&db_fn)?;
             if let Some(if_installed_) = &args.if_installed {
                 if_installed(
                     if_installed_.split(',').map(|x| x.to_string()).collect(),
@@ -262,6 +262,7 @@ fn main_sub() -> anyhow::Result<u8> {
             println!("update completed");
         }
         Command::Remove(args) => {
+            let installed_packages = get_installed_packages(&db_fn)?;
             if let Some(if_installed_) = &args.if_installed {
                 if_installed(
                     if_installed_.split(',').map(|x| x.to_string()).collect(),
@@ -282,6 +283,7 @@ fn main_sub() -> anyhow::Result<u8> {
             println!("remove completed");
         }
         Command::Check(args) => {
+            let installed_packages = get_installed_packages(&db_fn)?;
             let packages = if args.packages.is_empty() {
                 installed_packages.keys().map(|x| x.to_string()).collect()
             } else {
@@ -304,11 +306,13 @@ fn main_sub() -> anyhow::Result<u8> {
             }
         }
         Command::ListInstalled => {
+            let installed_packages = get_installed_packages(&db_fn)?;
             for (package_name, package_info) in &installed_packages {
                 println!("{package_name}-{}", package_info.version);
             }
         }
         Command::ShowUntracked(args) => {
+            let installed_packages = get_installed_packages(&db_fn)?;
             show_untracked(args.paths.clone(), &installed_packages, &mainargs.prefix)?;
         }
         Command::CleanCache => {

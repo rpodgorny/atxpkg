@@ -130,13 +130,13 @@ fn get_repo_listing(repo: &str, unverified_ssl: bool) -> Vec<String> {
     log::info!("getting repo listing from {repo}");
 
     if is_url(repo) {
-        match get_repo_listing_http(repo, unverified_ssl) {
-            Ok(res) => return res,
+        return match get_repo_listing_http(repo, unverified_ssl) {
+            Ok(res) => res,
             Err(err) => {
                 log::error!("failed to get listing from {repo}: {err}");
-                return vec![];
+                vec![]
             }
-        }
+        };
     }
 
     match get_repo_listing_dir(repo) {
@@ -192,11 +192,11 @@ fn get_repo_listing_dir(path: &str) -> anyhow::Result<Vec<String>> {
         if entry.file_type().is_dir() {
             continue;
         }
-        let file_path = entry.path();
-        if !file_path.to_string_lossy().ends_with(".atxpkg.zip") {
+        let file_path = as_unix_path(entry.path());
+        if !file_path.ends_with(".atxpkg.zip") {
             continue;
         }
-        ret.push(file_path.to_string_lossy().replace('\\', "/"));
+        ret.push(file_path);
     }
 
     Ok(ret)
@@ -240,12 +240,6 @@ fn download_package_if_needed(
         }
     }
 
-    // TODO: would buffered writer speed things up?
-    let f = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&fn_temp)?;
-
     let client = reqwest::blocking::ClientBuilder::new()
         .danger_accept_invalid_certs(unverified_ssl)
         .build()?;
@@ -273,6 +267,10 @@ fn download_package_if_needed(
         reader = Box::new(pb.wrap_read(reader));
     }
 
+    let f = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&fn_temp)?;
     let mut f = BufWriter::new(f);
     std::io::copy(&mut reader, &mut f)?;
     f.flush()?;
@@ -385,14 +383,13 @@ pub fn if_installed(
     packages: Vec<String>,
     installed_packages: &HashMap<String, InstalledPackage>,
 ) -> anyhow::Result<()> {
-    for p in packages {
-        let (package_name, package_version) = split_package_name_version(&p);
-        if let Some(installed_package) = installed_packages.get(&package_name) {
-            if !package_version.is_empty() && package_version != installed_package.version {
-                anyhow::bail!("package {package_name}-{package_version} not installed");
-            }
-        } else {
+    for p in &packages {
+        let (package_name, package_version) = split_package_name_version(p);
+        let Some(installed_package) = installed_packages.get(&package_name) else {
             anyhow::bail!("package {package_name} not installed");
+        };
+        if !package_version.is_empty() && package_version != installed_package.version {
+            anyhow::bail!("package {package_name}-{package_version} not installed");
         }
     }
     Ok(())
@@ -400,18 +397,15 @@ pub fn if_installed(
 
 pub fn clean_cache(cache_dir: &str) -> anyhow::Result<()> {
     let files = std::fs::read_dir(cache_dir)?;
-
     for file in files {
         let file = file?;
         let file_path = file.path();
-
         if file_path.file_name().is_some() {
             let file_path_str = file_path.to_string_lossy().into_owned();
             std::fs::remove_file(&file_path)?;
             eprintln!("D {file_path_str}");
         }
     }
-
     Ok(())
 }
 
@@ -454,13 +448,11 @@ pub fn install_packages(
         urls_to_install.push(url.clone());
         let (package_name, package_version) =
             split_package_name_version(&get_package_fn(&url).unwrap());
-        if download_only {
-            println!("download {package_name}-{package_version}");
-        } else {
-            println!("install {package_name}-{package_version}");
+        match download_only {
+            true => println!("download {package_name}-{package_version}"),
+            false => println!("install {package_name}-{package_version}"),
         }
     }
-
     if !no && !(yes || yes_no("continue?", "y")) {
         return Ok(None);
     }
@@ -798,10 +790,8 @@ pub fn update_package(
 
         for f in &files {
             let target_fn = format!("{prefix}/{f}");
-            if Path::new(&target_fn).exists() {
-                if !installed_package.md5sums.contains_key(f) {
-                    anyhow::bail!("{f} already exists but is not part of original package");
-                }
+            if Path::new(&target_fn).exists() && !installed_package.md5sums.contains_key(f) {
+                anyhow::bail!("{f} already exists but is not part of original package");
             }
         }
 
@@ -991,11 +981,9 @@ pub fn remove_packages(
 ) -> anyhow::Result<Option<HashMap<String, InstalledPackage>>> {
     for p in &packages {
         let (package_name, mut package_version) = split_package_name_version(p);
-        let installed_package = installed_packages.get(&package_name);
-        if installed_package.is_none() {
+        let Some(installed_package) = installed_packages.get(&package_name) else {
             return Err(anyhow::anyhow!("package {package_name} not installed"));
-        }
-        let installed_package = installed_package.unwrap();
+        };
         if !package_version.is_empty() {
             if package_version != installed_package.version {
                 anyhow::bail!("package {package_name}-{package_version} not installed");
@@ -1006,7 +994,6 @@ pub fn remove_packages(
 
         println!("remove {package_name}-{package_version}");
     }
-
     if no || !(yes || yes_no("continue?", "n")) {
         return Ok(None);
     }
@@ -1157,14 +1144,11 @@ pub fn update_packages(
         let Some(installed_package) = installed_packages.get(&pu.name_old) else {
             return Err(anyhow::anyhow!("package {} not installed", pu.name_old));
         };
-        if !pu.version_old.is_empty() && pu.version_old != installed_package.version {
-            anyhow::bail!("package {}-{} not installed", pu.name_old, pu.version_old);
-        }
-
         if pu.version_old.is_empty() {
             pu.version_old.clone_from(&installed_package.version);
+        } else if pu.version_old != installed_package.version {
+            anyhow::bail!("package {}-{} not installed", pu.name_old, pu.version_old);
         }
-
         if pu.name_old != pu.name_new && installed_packages.contains_key(&pu.name_new) {
             return Err(anyhow::anyhow!("package {} already installed", pu.name_new));
         }
@@ -1173,16 +1157,13 @@ pub fn update_packages(
     let available_packages = get_available_packages(repos, offline, unverified_ssl);
 
     for pu in &mut package_updates {
-        if !available_packages.contains_key(&pu.name_new) {
+        let Some(avail_pkg) = available_packages.get(&pu.name_new) else {
             return Err(anyhow::anyhow!("package {} not available", pu.name_new));
-        }
-
+        };
         if pu.version_new.is_empty() {
-            pu.version_new = get_max_version(available_packages[&pu.name_new].clone()).unwrap();
+            pu.version_new = get_max_version(avail_pkg.clone()).unwrap();
         }
-
-        let url =
-            get_specific_version_url(available_packages[&pu.name_new].clone(), &pu.version_new);
+        let url = get_specific_version_url(avail_pkg.clone(), &pu.version_new);
         if url.clone().unwrap().is_empty() {
             anyhow::bail!("package {}-{} not available", pu.name_new, pu.version_new);
         }
@@ -1203,7 +1184,6 @@ pub fn update_packages(
             pu.name_old, pu.version_old, pu.name_new, pu.version_new
         );
     }
-
     if !no && !(yes || yes_no("continue?", "y")) {
         return Ok(None);
     }
