@@ -99,9 +99,10 @@ fn get_available_packages(
         .filter(|repo| !offline || !is_url(repo))
         .map(|repo| {
             get_repo_listing(&repo, unverified_ssl)
+                .unwrap()
                 .into_iter()
                 .filter_map(|url| {
-                    let package_fn = get_package_fn(&url).unwrap();
+                    let package_fn = get_package_fn(&url)?;
                     if !is_valid_package_fn(&package_fn) {
                         log::warn!("{package_fn} not a valid package filename");
                         return None;
@@ -126,24 +127,24 @@ fn is_url(s: &str) -> bool {
     s.starts_with("http://") || s.starts_with("https://")
 }
 
-fn get_repo_listing(repo: &str, unverified_ssl: bool) -> Vec<String> {
+fn get_repo_listing(repo: &str, unverified_ssl: bool) -> anyhow::Result<Vec<String>> {
     log::info!("getting repo listing from {repo}");
 
     if is_url(repo) {
+        // TODO: just use "?"
         return match get_repo_listing_http(repo, unverified_ssl) {
-            Ok(res) => res,
+            Ok(res) => Ok(res),
             Err(err) => {
-                log::error!("failed to get listing from {repo}: {err}");
-                vec![]
+                anyhow::bail!("failed to get listing from {repo}: {err}");
             }
         };
     }
 
+    // TODO: just use "?"
     match get_repo_listing_dir(repo) {
-        Ok(ret) => ret,
+        Ok(ret) => Ok(ret),
         Err(err) => {
-            log::error!("error accessing directory: {err}");
-            vec![]
+            anyhow::bail!("error accessing directory: {err}");
         }
     }
 }
@@ -1058,7 +1059,7 @@ pub fn remove_package(
                 //    "{target_fn} changed, saving as {target_fn}.atxpkg_backup"
                 //));
                 progress_bar.suspend(|| {
-                    format!("{target_fn} changed, saving as {target_fn}.atxpkg_backup");
+                    eprintln!("{target_fn} changed, saving as {target_fn}.atxpkg_backup");
                 });
                 move_file(&target_fn, &format!("{target_fn}.atxpkg_backup"))?;
             } else {

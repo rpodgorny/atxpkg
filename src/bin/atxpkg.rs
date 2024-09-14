@@ -190,14 +190,15 @@ fn main_sub() -> anyhow::Result<u8> {
     }
 
     let mut repos = vec![cache_dir.clone()];
-
     if Path::new(&repos_fn).exists() {
         for line in std::fs::read_to_string(&repos_fn)?.lines() {
+            let line = line.trim();
             if !line.is_empty() && !line.starts_with('#') {
                 repos.push(line.to_string());
             }
         }
     }
+    log::debug!("repos: {repos:?}");
 
     match &mainargs.command {
         Command::Install(args) => {
