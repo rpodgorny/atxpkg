@@ -132,24 +132,10 @@ fn is_url(s: &str) -> bool {
 
 fn get_repo_listing(repo: &str, unverified_ssl: bool) -> anyhow::Result<Vec<String>> {
     log::info!("getting repo listing from {repo}");
-
     if is_url(repo) {
-        // TODO: just use "?"
-        return match get_repo_listing_http(repo, unverified_ssl) {
-            Ok(res) => Ok(res),
-            Err(err) => {
-                anyhow::bail!("failed to get listing from {repo}: {err}");
-            }
-        };
+        return get_repo_listing_http(repo, unverified_ssl);
     }
-
-    // TODO: just use "?"
-    match get_repo_listing_dir(repo) {
-        Ok(ret) => Ok(ret),
-        Err(err) => {
-            anyhow::bail!("error accessing directory: {err}");
-        }
-    }
+    get_repo_listing_dir(repo)
 }
 
 fn get_repo_listing_http(url: &str, unverified_ssl: bool) -> anyhow::Result<Vec<String>> {
