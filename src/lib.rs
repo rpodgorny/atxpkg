@@ -412,7 +412,7 @@ pub fn install_packages(
     unverified_ssl: bool,
     cache_dir: &str,
     tmp_dir_prefix: &str,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<bool> {
     let available_packages = get_available_packages(repos, offline, unverified_ssl);
 
     for p in &packages {
@@ -444,7 +444,7 @@ pub fn install_packages(
         }
     }
     if !no && !(yes || yes_no("continue?", "y")) {
-        return Ok(());
+        return Ok(false);
     }
 
     let mb = indicatif::MultiProgress::new();
@@ -466,7 +466,7 @@ pub fn install_packages(
     //mb.clear()?;
 
     if download_only {
-        return Ok(());
+        return Ok(false);
     }
 
     for local_fn in &local_fns_to_install {
@@ -477,7 +477,7 @@ pub fn install_packages(
         println!("{package_name}-{package_version} is now installed");
     }
 
-    Ok(())
+    Ok(true)
 }
 
 fn yes_no(prompt: &str, default: &str) -> bool {
@@ -966,7 +966,7 @@ pub fn remove_packages(
     prefix: &str,
     yes: bool,
     no: bool,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<bool> {
     for p in &packages {
         let (package_name, mut package_version) = split_package_name_version(p);
         let Some(installed_package) = installed_packages.get(&package_name) else {
@@ -983,7 +983,7 @@ pub fn remove_packages(
         println!("remove {package_name}-{package_version}");
     }
     if no || !(yes || yes_no("continue?", "n")) {
-        return Ok(());
+        return Ok(false);
     }
 
     for p in &packages {
@@ -996,7 +996,7 @@ pub fn remove_packages(
         installed_packages.remove(&package_name);
     }
 
-    Ok(())
+    Ok(true)
 }
 
 pub fn remove_package(
@@ -1095,7 +1095,7 @@ pub fn update_packages(
     unverified_ssl: bool,
     cache_dir: &str,
     tmp_dir_prefix: &str,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<bool> {
     let mut package_updates = vec![];
 
     for p in &packages {
@@ -1161,7 +1161,7 @@ pub fn update_packages(
 
     if package_updates.is_empty() {
         println!("nothing to update");
-        return Ok(());
+        return Ok(false);
     }
 
     for pu in &package_updates {
@@ -1171,7 +1171,7 @@ pub fn update_packages(
         );
     }
     if !no && !(yes || yes_no("continue?", "y")) {
-        return Ok(());
+        return Ok(false);
     }
 
     let mb = indicatif::MultiProgress::new();
@@ -1200,7 +1200,7 @@ pub fn update_packages(
     //mb.clear()?;
 
     if download_only {
-        return Ok(());
+        return Ok(false);
     }
 
     for pu in package_updates {
@@ -1229,7 +1229,7 @@ pub fn update_packages(
         );
     }
 
-    Ok(())
+    Ok(true)
 }
 
 fn check_package(package_name: &str, pkg: &InstalledPackage, prefix: &str) -> anyhow::Result<u32> {

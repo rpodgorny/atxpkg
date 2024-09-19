@@ -224,9 +224,10 @@ fn main_sub() -> anyhow::Result<u8> {
                 &tmp_dir_prefix,
             );
             save_installed_packages(&installed_packages, &db_fn)?;
-            res?;
-            log::info!("install completed");
-            println!("install completed");
+            if res? {
+                log::info!("install completed");
+                println!("install completed");
+            }
         }
         Command::Update(args) => {
             let mut installed_packages = get_installed_packages(&db_fn)?;
@@ -256,9 +257,10 @@ fn main_sub() -> anyhow::Result<u8> {
                 &tmp_dir_prefix,
             );
             save_installed_packages(&installed_packages, &db_fn)?;
-            res?;
-            log::info!("update completed");
-            println!("update completed");
+            if res? {
+                log::info!("update completed");
+                println!("update completed");
+            }
         }
         Command::Remove(args) => {
             let mut installed_packages = get_installed_packages(&db_fn)?;
@@ -276,9 +278,10 @@ fn main_sub() -> anyhow::Result<u8> {
                 args.no,
             );
             save_installed_packages(&installed_packages, &db_fn)?;
-            res?;
-            log::info!("remove completed");
-            println!("remove completed");
+            if res? {
+                log::info!("remove completed");
+                println!("remove completed");
+            }
         }
         Command::Check(args) => {
             let installed_packages = get_installed_packages(&db_fn)?;
