@@ -412,7 +412,7 @@ pub fn clean_cache(cache_dir: &str) -> anyhow::Result<()> {
 
 pub fn install_packages(
     packages: Vec<String>,
-    installed_packages: &HashMap<String, InstalledPackage>,
+    installed_packages: &mut HashMap<String, InstalledPackage>,
     prefix: &str,
     repos: Vec<String>,
     force: bool,
@@ -423,7 +423,7 @@ pub fn install_packages(
     unverified_ssl: bool,
     cache_dir: &str,
     tmp_dir_prefix: &str,
-) -> anyhow::Result<Option<HashMap<String, InstalledPackage>>> {
+) -> anyhow::Result<()> {
     let available_packages = get_available_packages(repos, offline, unverified_ssl);
 
     for p in &packages {
@@ -455,7 +455,7 @@ pub fn install_packages(
         }
     }
     if !no && !(yes || yes_no("continue?", "y")) {
-        return Ok(None);
+        return Ok(());
     }
 
     let mb = indicatif::MultiProgress::new();
@@ -477,10 +477,8 @@ pub fn install_packages(
     //mb.clear()?;
 
     if download_only {
-        return Ok(None);
+        return Ok(());
     }
-
-    let mut installed_packages = installed_packages.clone();
 
     for local_fn in &local_fns_to_install {
         let (package_name, package_version) =
@@ -490,7 +488,7 @@ pub fn install_packages(
         println!("{package_name}-{package_version} is now installed");
     }
 
-    Ok(Some(installed_packages))
+    Ok(())
 }
 
 fn yes_no(prompt: &str, default: &str) -> bool {
@@ -975,11 +973,11 @@ pub fn update_package(
 
 pub fn remove_packages(
     packages: Vec<String>,
-    installed_packages: &HashMap<String, InstalledPackage>,
+    installed_packages: &mut HashMap<String, InstalledPackage>,
     prefix: &str,
     yes: bool,
     no: bool,
-) -> anyhow::Result<Option<HashMap<String, InstalledPackage>>> {
+) -> anyhow::Result<()> {
     for p in &packages {
         let (package_name, mut package_version) = split_package_name_version(p);
         let Some(installed_package) = installed_packages.get(&package_name) else {
@@ -996,10 +994,8 @@ pub fn remove_packages(
         println!("remove {package_name}-{package_version}");
     }
     if no || !(yes || yes_no("continue?", "n")) {
-        return Ok(None);
+        return Ok(());
     }
-
-    let mut installed_packages = installed_packages.clone();
 
     for p in &packages {
         let package_name = get_package_name(p);
@@ -1011,7 +1007,7 @@ pub fn remove_packages(
         installed_packages.remove(&package_name);
     }
 
-    Ok(Some(installed_packages))
+    Ok(())
 }
 
 pub fn remove_package(
@@ -1099,7 +1095,7 @@ pub fn is_empty_dir(path: &Path) -> anyhow::Result<bool> {
 
 pub fn update_packages(
     packages: Vec<String>,
-    installed_packages: &HashMap<String, InstalledPackage>,
+    installed_packages: &mut HashMap<String, InstalledPackage>,
     prefix: &str,
     repos: Vec<String>,
     force: bool,
@@ -1110,7 +1106,7 @@ pub fn update_packages(
     unverified_ssl: bool,
     cache_dir: &str,
     tmp_dir_prefix: &str,
-) -> anyhow::Result<Option<HashMap<String, InstalledPackage>>> {
+) -> anyhow::Result<()> {
     let mut package_updates = vec![];
 
     for p in &packages {
@@ -1176,7 +1172,7 @@ pub fn update_packages(
 
     if package_updates.is_empty() {
         println!("nothing to update");
-        return Ok(None);
+        return Ok(());
     }
 
     for pu in &package_updates {
@@ -1186,10 +1182,8 @@ pub fn update_packages(
         );
     }
     if !no && !(yes || yes_no("continue?", "y")) {
-        return Ok(None);
+        return Ok(());
     }
-
-    let mut installed_packages = installed_packages.clone();
 
     let mb = indicatif::MultiProgress::new();
 
@@ -1217,11 +1211,9 @@ pub fn update_packages(
     //mb.clear()?;
 
     if download_only {
-        return Ok(None);
+        return Ok(());
     }
 
-    // TODO: this is wrong. if some packages succeed and one fails, the resulted
-    // updated installed_packages list is not saved to filesystem
     for pu in package_updates {
         let mut package_info = update_package(
             &pu.local_fn,
@@ -1248,7 +1240,7 @@ pub fn update_packages(
         );
     }
 
-    Ok(Some(installed_packages))
+    Ok(())
 }
 
 fn check_package(package_name: &str, pkg: &InstalledPackage, prefix: &str) -> anyhow::Result<u32> {

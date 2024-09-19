@@ -202,16 +202,16 @@ fn main_sub() -> anyhow::Result<u8> {
 
     match &mainargs.command {
         Command::Install(args) => {
-            let installed_packages = get_installed_packages(&db_fn)?;
+            let mut installed_packages = get_installed_packages(&db_fn)?;
             if let Some(if_installed_) = &args.if_installed {
                 if_installed(
                     if_installed_.split(',').map(|x| x.to_string()).collect(),
                     &installed_packages,
                 )?;
             }
-            let new_installed_packages = install_packages(
+            let res = install_packages(
                 args.packages.to_vec(),
-                &installed_packages,
+                &mut installed_packages,
                 &mainargs.prefix,
                 repos,
                 args.force,
@@ -222,15 +222,14 @@ fn main_sub() -> anyhow::Result<u8> {
                 args.unverified_ssl,
                 &cache_dir,
                 &tmp_dir_prefix,
-            )?;
-            if let Some(new_installed_packages) = new_installed_packages {
-                save_installed_packages(&new_installed_packages, &db_fn)?;
-            }
+            );
+            save_installed_packages(&installed_packages, &db_fn)?;
+            res?;
             log::info!("install completed");
             println!("install completed");
         }
         Command::Update(args) => {
-            let installed_packages = get_installed_packages(&db_fn)?;
+            let mut installed_packages = get_installed_packages(&db_fn)?;
             if let Some(if_installed_) = &args.if_installed {
                 if_installed(
                     if_installed_.split(',').map(|x| x.to_string()).collect(),
@@ -242,9 +241,9 @@ fn main_sub() -> anyhow::Result<u8> {
             } else {
                 args.packages.to_vec()
             };
-            let new_installed_packages = update_packages(
+            let res = update_packages(
                 packages,
-                &installed_packages,
+                &mut installed_packages,
                 &mainargs.prefix,
                 repos,
                 args.force,
@@ -255,31 +254,29 @@ fn main_sub() -> anyhow::Result<u8> {
                 args.unverified_ssl,
                 &cache_dir,
                 &tmp_dir_prefix,
-            )?;
-            if let Some(new_installed_packages) = new_installed_packages {
-                save_installed_packages(&new_installed_packages, &db_fn)?;
-            }
+            );
+            save_installed_packages(&installed_packages, &db_fn)?;
+            res?;
             log::info!("update completed");
             println!("update completed");
         }
         Command::Remove(args) => {
-            let installed_packages = get_installed_packages(&db_fn)?;
+            let mut installed_packages = get_installed_packages(&db_fn)?;
             if let Some(if_installed_) = &args.if_installed {
                 if_installed(
                     if_installed_.split(',').map(|x| x.to_string()).collect(),
                     &installed_packages,
                 )?;
             }
-            let new_installed_packages = remove_packages(
+            let res = remove_packages(
                 args.packages.to_vec(),
-                &installed_packages,
+                &mut installed_packages,
                 &mainargs.prefix,
                 args.yes,
                 args.no,
-            )?;
-            if let Some(new_installed_packages) = new_installed_packages {
-                save_installed_packages(&new_installed_packages, &db_fn)?;
-            }
+            );
+            save_installed_packages(&installed_packages, &db_fn)?;
+            res?;
             log::info!("remove completed");
             println!("remove completed");
         }

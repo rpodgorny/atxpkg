@@ -25,9 +25,10 @@ fn test_install_packages() {
     let tmp_dir = tempfile::Builder::new().tempdir().unwrap();
     let cache_dir = tempfile::Builder::new().tempdir().unwrap();
 
-    let new_installed_packages = atxpkg::install_packages(
+    let mut installed_packages = HashMap::default();
+    atxpkg::install_packages(
         vec!["atx300-base".to_string(), "test".to_string()],
-        &HashMap::new(),
+        &mut installed_packages,
         dest_dir_str,
         vec!["./test_data".to_string()],
         false,
@@ -39,10 +40,9 @@ fn test_install_packages() {
         cache_dir.path().to_str().unwrap(),
         tmp_dir.path().to_str().unwrap(),
     )
-    .unwrap()
     .unwrap();
 
-    let pkginfo = new_installed_packages.get("atx300-base").unwrap();
+    let pkginfo = installed_packages.get("atx300-base").unwrap();
     assert_eq!(pkginfo.version, "6.3-1");
     assert_eq!(pkginfo.md5sums.len(), 43);
     assert!(Path::new(&format!("{dest_dir_str}/atx300/memsh.mem")).exists());
@@ -82,9 +82,10 @@ fn test_update_packages() {
     let tmp_dir = tempfile::Builder::new().tempdir().unwrap();
     let cache_dir = tempfile::Builder::new().tempdir().unwrap();
 
-    let new_installed_packages = atxpkg::install_packages(
+    let mut installed_packages = HashMap::default();
+    atxpkg::install_packages(
         vec!["atx300-base".to_string(), "test-1.0-1".to_string()],
-        &HashMap::new(),
+        &mut installed_packages,
         dest_dir_str,
         vec!["./test_data".to_string()],
         false,
@@ -96,25 +97,24 @@ fn test_update_packages() {
         cache_dir.path().to_str().unwrap(),
         tmp_dir.path().to_str().unwrap(),
     )
-    .unwrap()
     .unwrap();
 
-    let pkginfo = new_installed_packages.get("atx300-base").unwrap();
+    let pkginfo = installed_packages.get("atx300-base").unwrap();
     assert_eq!(pkginfo.version, "6.3-1");
     assert_eq!(pkginfo.md5sums.len(), 43);
     assert!(Path::new(&format!("{dest_dir_str}/atx300/memsh.mem")).exists());
     assert!(!Path::new(&format!("{dest_dir_str}/atx300/.atxpkg_backup")).exists());
 
-    let pkginfo = new_installed_packages.get("test").unwrap();
+    let pkginfo = installed_packages.get("test").unwrap();
     assert_eq!(pkginfo.version, "1.0-1");
     assert!(Path::new(&format!("{dest_dir_str}/test/protected1")).exists());
 
-    let new_installed_packages = atxpkg::update_packages(
+    atxpkg::update_packages(
         vec![
             "atx300-base..atx300-base.dev".to_string(),
             "test".to_string(),
         ],
-        &new_installed_packages,
+        &mut installed_packages,
         dest_dir_str,
         vec!["./test_data".to_string()],
         false,
@@ -126,15 +126,14 @@ fn test_update_packages() {
         cache_dir.path().to_str().unwrap(),
         tmp_dir.path().to_str().unwrap(),
     )
-    .unwrap()
     .unwrap();
 
-    assert!(!new_installed_packages.contains_key("atx300-base"));
-    let pkginfo = new_installed_packages.get("atx300-base.dev").unwrap();
+    assert!(!installed_packages.contains_key("atx300-base"));
+    let pkginfo = installed_packages.get("atx300-base.dev").unwrap();
     assert_eq!(pkginfo.version, "0-1");
     assert!(Path::new(&format!("{dest_dir_str}/atx300/memsh.mem")).exists());
 
-    let pkginfo = new_installed_packages.get("test").unwrap();
+    let pkginfo = installed_packages.get("test").unwrap();
     assert_eq!(pkginfo.version, "2.0-1");
     assert!(Path::new(&format!("{dest_dir_str}/test/protected1")).exists());
 }
@@ -146,9 +145,10 @@ fn test_remove_packages() {
     let tmp_dir = tempfile::Builder::new().tempdir().unwrap();
     let cache_dir = tempfile::Builder::new().tempdir().unwrap();
 
-    let new_installed_packages = atxpkg::install_packages(
+    let mut installed_packages = HashMap::default();
+    atxpkg::install_packages(
         vec!["atx300-base".to_string(), "test".to_string()],
-        &HashMap::new(),
+        &mut installed_packages,
         dest_dir_str,
         vec!["./test_data".to_string()],
         false,
@@ -160,27 +160,25 @@ fn test_remove_packages() {
         cache_dir.path().to_str().unwrap(),
         tmp_dir.path().to_str().unwrap(),
     )
-    .unwrap()
     .unwrap();
 
-    let pkginfo = new_installed_packages.get("atx300-base").unwrap();
+    let pkginfo = installed_packages.get("atx300-base").unwrap();
     assert_eq!(pkginfo.version, "6.3-1");
     assert_eq!(pkginfo.md5sums.len(), 43);
     assert!(Path::new(&format!("{dest_dir_str}/atx300/memsh.mem")).exists());
     assert!(!Path::new(&format!("{dest_dir_str}/atx300/.atxpkg_backup")).exists());
     assert!(Path::new(&format!("{dest_dir_str}/test/protected1")).exists());
 
-    let new_installed_packages = atxpkg::remove_packages(
+    atxpkg::remove_packages(
         vec!["atx300-base".to_string(), "test".to_string()],
-        &new_installed_packages,
+        &mut installed_packages,
         dest_dir_str,
         true,
         false,
     )
-    .unwrap()
     .unwrap();
 
-    assert!(new_installed_packages.is_empty());
+    assert!(installed_packages.is_empty());
     assert!(!Path::new(&format!("{dest_dir_str}/atx300/memsh.mem")).exists());
     assert!(!Path::new(&format!("{dest_dir_str}/test/protected1")).exists());
 
