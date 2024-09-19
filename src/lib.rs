@@ -463,8 +463,6 @@ pub fn install_packages(
         })
         .collect::<Vec<_>>();
 
-    //mb.clear()?;
-
     if download_only {
         return Ok(false);
     }
@@ -1196,8 +1194,6 @@ pub fn update_packages(
                 }
             })
             .collect::<Vec<_>>();
-
-    //mb.clear()?;
 
     if download_only {
         return Ok(false);
