@@ -603,7 +603,7 @@ fn install_package(
         for f in progress_bar.wrap_iter(files.iter()) {
             let target_fn = format!("{prefix}/{f}");
             if Path::new(&target_fn).exists() {
-                return Err(anyhow::anyhow!("file exists: {target_fn}"));
+                anyhow::bail!("file exists: {target_fn}");
             }
         }
 
@@ -981,7 +981,7 @@ pub fn remove_packages(
     for p in &packages {
         let (package_name, mut package_version) = split_package_name_version(p);
         let Some(installed_package) = installed_packages.get(&package_name) else {
-            return Err(anyhow::anyhow!("package {package_name} not installed"));
+            anyhow::bail!("package {package_name} not installed");
         };
         if !package_version.is_empty() {
             if package_version != installed_package.version {
@@ -1139,7 +1139,7 @@ pub fn update_packages(
 
     for pu in &mut package_updates {
         let Some(installed_package) = installed_packages.get(&pu.name_old) else {
-            return Err(anyhow::anyhow!("package {} not installed", pu.name_old));
+            anyhow::bail!("package {} not installed", pu.name_old);
         };
         if pu.version_old.is_empty() {
             pu.version_old.clone_from(&installed_package.version);
@@ -1147,7 +1147,7 @@ pub fn update_packages(
             anyhow::bail!("package {}-{} not installed", pu.name_old, pu.version_old);
         }
         if pu.name_old != pu.name_new && installed_packages.contains_key(&pu.name_new) {
-            return Err(anyhow::anyhow!("package {} already installed", pu.name_new));
+            anyhow::bail!("package {} already installed", pu.name_new);
         }
     }
 
@@ -1155,7 +1155,7 @@ pub fn update_packages(
 
     for pu in &mut package_updates {
         let Some(avail_pkg) = available_packages.get(&pu.name_new) else {
-            return Err(anyhow::anyhow!("package {} not available", pu.name_new));
+            anyhow::bail!("package {} not available", pu.name_new);
         };
         if pu.version_new.is_empty() {
             pu.version_new = get_max_version(avail_pkg.clone()).unwrap();
@@ -1292,7 +1292,7 @@ pub fn check_packages(
             || (!package_version.is_empty()
                 && package_version != installed_packages[&package_name].version)
         {
-            return Err(anyhow::anyhow!("{package_name} not installed"));
+            anyhow::bail!("{package_name} not installed");
         }
     }
 
@@ -1305,7 +1305,7 @@ pub fn check_packages(
     }
 
     if err_count > 0 {
-        return Err(anyhow::anyhow!("error count: {err_count}"));
+        anyhow::bail!("error count: {err_count}");
     }
 
     Ok(())
