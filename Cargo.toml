@@ -30,3 +30,5 @@ debug = false
 
 [profile.release]
 debug = "line-tables-only"
+codegen-units = 1
+lto = true
