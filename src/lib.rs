@@ -109,7 +109,6 @@ fn get_available_packages(
                 &repo,
                 "{spinner} {prefix} [{wide_bar}] {bytes}/{total_bytes} ({bytes_per_sec})",
             );
-            pb.enable_steady_tick(Duration::from_millis(200));
             mb.add(pb.clone());
             get_repo_listing(&repo, unverified_ssl, Some(&pb))
                 .unwrap()
