@@ -27,14 +27,14 @@ struct PackageUpdate {
 }
 
 fn as_unix_path(pth: &Path) -> String {
-    let mut ret = pth
+    let ret = pth
         .components()
         .map(|x| x.as_os_str().to_string_lossy())
         .join("/");
     // TODO: this used to fuck up things for windows - investigate and fix
     #[cfg(target_os = "linux")]
     if pth.is_absolute() {
-        ret = format!("/{ret}");
+        return format!("/{ret}");
     }
     ret
 }
@@ -1314,8 +1314,6 @@ pub fn show_untracked(
     prefix: &str,
 ) -> anyhow::Result<()> {
     let fn_to_package_name = gen_fn_to_package_name_mapping(installed_packages);
-
-    //anyhow::bail!("FAKE ERROR");
 
     let paths = if paths.is_empty() {
         let mut first_dirs = HashSet::new();
