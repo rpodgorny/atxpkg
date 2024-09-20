@@ -240,7 +240,7 @@ fn download_package_if_needed(
         return Ok(fn_);
     }
 
-    log::info!("downloading {url} to {fn_}");
+    log::info!("downloading {url} to {fn_temp}");
     let mut resume_from = 0;
 
     if Path::new(&fn_temp).exists() {
