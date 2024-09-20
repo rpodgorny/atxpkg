@@ -25,10 +25,8 @@ time = { version = "0.3.36", features = ["local-offset", "macros"] }
 walkdir = "2.5.0"
 zip = { version = "2.2.0", features = ["time"] }
 
-#[profile.release.package."*"]
-#debug = false
-#strip = true
+[profile.release.package."*"]
+debug = false
 
 [profile.release]
-debug = true
-#strip = false
+debug = "line-tables-only"
