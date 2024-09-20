@@ -97,11 +97,21 @@ fn get_available_packages(
     unverified_ssl: bool,
 ) -> HashMap<String, Vec<String>> {
     log::debug!("getting available packages from {repos:?}");
-    repos
+
+    let mb = indicatif::MultiProgress::new();
+
+    let ret = repos
         .into_par_iter()
         .filter(|repo| !offline || !is_url(repo))
         .map(|repo| {
-            get_repo_listing(&repo, unverified_ssl)
+            let pb = make_progress_bar(
+                0,
+                &repo,
+                "{spinner} {prefix} [{wide_bar}] {bytes}/{total_bytes} ({bytes_per_sec})",
+            );
+            pb.enable_steady_tick(Duration::from_millis(200));
+            mb.add(pb.clone());
+            get_repo_listing(&repo, unverified_ssl, Some(&pb))
                 .unwrap()
                 .into_iter()
                 .filter_map(|url| {
@@ -118,7 +128,11 @@ fn get_available_packages(
         .flatten()
         .collect::<Vec<_>>()
         .into_iter()
-        .into_group_map()
+        .into_group_map();
+
+    eprintln!("");
+
+    ret
 }
 
 fn is_valid_package_fn(fn_: &str) -> bool {
@@ -130,38 +144,47 @@ fn is_url(s: &str) -> bool {
     s.starts_with("http://") || s.starts_with("https://")
 }
 
-fn get_repo_listing(repo: &str, unverified_ssl: bool) -> anyhow::Result<Vec<String>> {
+fn get_repo_listing(
+    repo: &str,
+    unverified_ssl: bool,
+    progress_bar: Option<&indicatif::ProgressBar>,
+) -> anyhow::Result<Vec<String>> {
     log::info!("getting repo listing from {repo}");
     if is_url(repo) {
-        return get_repo_listing_http(repo, unverified_ssl);
+        return get_repo_listing_http(repo, unverified_ssl, progress_bar);
     }
-    get_repo_listing_dir(repo)
+    get_repo_listing_dir(repo, progress_bar)
 }
 
-fn get_repo_listing_http(url: &str, unverified_ssl: bool) -> anyhow::Result<Vec<String>> {
+fn get_repo_listing_http(
+    url: &str,
+    unverified_ssl: bool,
+    progress_bar: Option<&indicatif::ProgressBar>,
+) -> anyhow::Result<Vec<String>> {
     let client = reqwest::blocking::ClientBuilder::new()
         .danger_accept_invalid_certs(unverified_ssl)
         .build()?;
-    let mut response = client.get(url).send()?;
-    if !response.status().is_success() {
-        anyhow::bail!("Failed to download listing: {}", response.status());
+    let resp = client.get(url).send()?;
+    if !resp.status().is_success() {
+        anyhow::bail!("Failed to download listing: {}", resp.status());
     };
 
-    let total_size = response.content_length().unwrap_or(0);
+    let total_size = resp.content_length().unwrap_or(0);
 
-    let progress_bar = make_progress_bar(
-        total_size,
-        url,
-        "{spinner} {prefix} [{wide_bar}] {bytes}/{total_bytes} ({bytes_per_sec})",
-    );
-    progress_bar.enable_steady_tick(Duration::from_millis(200));
+    let mut reader: Box<dyn std::io::Read> = Box::new(resp);
+
+    if let Some(pb) = progress_bar {
+        pb.set_length(total_size);
+        pb.enable_steady_tick(Duration::from_millis(200));
+        reader = Box::new(pb.wrap_read(reader));
+    }
 
     let mut body = String::new();
-    progress_bar
-        .wrap_read(response.by_ref())
-        .read_to_string(&mut body)?;
+    reader.read_to_string(&mut body)?;
 
-    progress_bar.finish();
+    if let Some(pb) = progress_bar {
+        pb.finish();
+    }
 
     let re = lazy_regex::regex!(r#"href\s*=\s*["']?([^"'\s>]+)["']?"#);
     let files = re
@@ -174,7 +197,10 @@ fn get_repo_listing_http(url: &str, unverified_ssl: bool) -> anyhow::Result<Vec<
     Ok(files)
 }
 
-fn get_repo_listing_dir(path: &str) -> anyhow::Result<Vec<String>> {
+fn get_repo_listing_dir(
+    path: &str,
+    progress_bar: Option<&indicatif::ProgressBar>,
+) -> anyhow::Result<Vec<String>> {
     let mut ret = Vec::new();
 
     for entry in walkdir::WalkDir::new(path).into_iter() {
@@ -187,6 +213,10 @@ fn get_repo_listing_dir(path: &str) -> anyhow::Result<Vec<String>> {
             continue;
         }
         ret.push(file_path);
+    }
+
+    if let Some(pb) = progress_bar {
+        pb.finish();
     }
 
     Ok(ret)
@@ -463,6 +493,8 @@ pub fn install_packages(
         })
         .collect::<Vec<_>>();
 
+    eprintln!("");
+
     if download_only {
         return Ok(false);
     }
@@ -595,6 +627,7 @@ fn install_package(
         }
 
         progress_bar.finish();
+        eprintln!("");
     }
 
     let mut md5sums = HashMap::new();
@@ -638,6 +671,7 @@ fn install_package(
     }
 
     progress_bar.finish();
+    eprintln!("");
 
     Ok(InstalledPackage {
         t: Some(UNIX_EPOCH.elapsed().unwrap().as_secs_f64()),
@@ -710,6 +744,8 @@ fn unzip_to(zip_file: &str, output_dir: &str, progress_bar_prefix: &str) -> anyh
     }
 
     progress_bar.finish();
+    eprintln!("");
+
     log::debug!("done unzipping");
     Ok(())
 }
@@ -782,6 +818,7 @@ pub fn update_package(
         }
 
         progress_bar.finish();
+        eprintln!("");
     }
 
     let mut md5sums = HashMap::new();
@@ -874,6 +911,7 @@ pub fn update_package(
     }
 
     progress_bar.finish();
+    eprintln!("");
 
     let (mut dirs_old, mut files_old) = (vec![], vec![]);
     for (fn_or_dir_old, md5sum_old) in installed_package.md5sums.into_iter() {
@@ -949,6 +987,7 @@ pub fn update_package(
     }
 
     progress_bar.finish();
+    eprintln!("");
 
     Ok(InstalledPackage {
         t: Some(UNIX_EPOCH.elapsed().unwrap().as_secs_f64()),
@@ -1072,6 +1111,7 @@ pub fn remove_package(
     }
 
     progress_bar.finish();
+    eprintln!("");
 
     Ok(())
 }
@@ -1195,6 +1235,8 @@ pub fn update_packages(
             })
             .collect::<Vec<_>>();
 
+    eprintln!("");
+
     if download_only {
         return Ok(false);
     }
@@ -1258,6 +1300,7 @@ fn check_package(package_name: &str, pkg: &InstalledPackage, prefix: &str) -> an
     }
 
     progress_bar.finish();
+    eprintln!("");
 
     for r in res {
         println!("{r}");
@@ -1355,6 +1398,7 @@ pub fn show_untracked(
         }
 
         progress_bar.finish();
+        eprintln!("");
     }
 
     Ok(())
