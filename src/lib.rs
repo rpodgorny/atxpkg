@@ -379,10 +379,7 @@ fn split_package_name_version(pkg_spec: &str) -> (String, String) {
 
 fn get_package_fn(url: &str) -> Option<String> {
     let parts = url.split('/').map(|x| x.to_string()).collect::<Vec<_>>();
-    if parts.is_empty() {
-        return None;
-    }
-    Some(parts.last().unwrap_or(&"".to_string()).to_string())
+    parts.last().map(|x| x.to_string())
 }
 
 fn get_package_name(fn_: &str) -> String {
