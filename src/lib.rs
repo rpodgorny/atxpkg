@@ -472,7 +472,7 @@ pub fn install_packages(
             false => println!("install {package_name}-{package_version}"),
         }
     }
-    if !no && !(yes || yes_no("continue?", "y")) {
+    if no || !(yes || yes_no("continue?", "y")) {
         return Ok(false);
     }
 
@@ -1207,7 +1207,7 @@ pub fn update_packages(
             pu.name_old, pu.version_old, pu.name_new, pu.version_new
         );
     }
-    if !no && !(yes || yes_no("continue?", "y")) {
+    if no || !(yes || yes_no("continue?", "y")) {
         return Ok(false);
     }
 
