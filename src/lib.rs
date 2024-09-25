@@ -98,7 +98,7 @@ fn get_available_packages(
     repos: Vec<String>,
     offline: bool,
     unverified_ssl: bool,
-) -> HashMap<String, Vec<String>> {
+) -> anyhow::Result<HashMap<String, Vec<String>>> {
     log::debug!("getting available packages from {repos:?}");
 
     let mb = indicatif::MultiProgress::new();
@@ -113,11 +113,9 @@ fn get_available_packages(
                 "{spinner} {prefix} [{wide_bar}] {bytes}/{total_bytes} ({bytes_per_sec})",
             )?;
             mb.add(pb.clone());
-            let Ok(listing) = get_repo_listing(&repo, unverified_ssl, Some(&pb)) else {
-                pb.suspend(|| eprintln!("failed to get repo listing from {repo}"));
-                anyhow::bail!("failed to get repo listing from {repo}");
-            };
-            Ok(listing
+            let listing = get_repo_listing(&repo, unverified_ssl, Some(&pb));
+            pb.finish();
+            Ok(listing?
                 .into_iter()
                 .filter_map(|url| {
                     let package_fn = get_package_fn(&url)?;
@@ -130,16 +128,15 @@ fn get_available_packages(
                 })
                 .collect::<Vec<_>>())
         })
-        .map(|x| x.unwrap())
-        .flatten()
-        .collect::<Vec<_>>()
+        .collect::<anyhow::Result<Vec<_>>>()?
         .into_iter()
+        .flatten()
         .into_group_map();
 
     //mb.clear();
     eprintln!();
 
-    ret
+    Ok(ret)
 }
 
 fn is_valid_package_fn(fn_: &str) -> bool {
@@ -189,10 +186,6 @@ fn get_repo_listing_http(
     let mut body = String::new();
     reader.read_to_string(&mut body)?;
 
-    if let Some(pb) = progress_bar {
-        pb.finish();
-    }
-
     let re = lazy_regex::regex!(r#"href\s*=\s*["']?([^"'\s>]+)["']?"#);
     let files = re
         .captures_iter(&body)
@@ -220,10 +213,6 @@ fn get_repo_listing_dir(
             continue;
         }
         ret.push(file_path);
-    }
-
-    if let Some(pb) = progress_bar {
-        pb.finish();
     }
 
     Ok(ret)
@@ -349,7 +338,7 @@ pub fn list_available(
     unverified_ssl: bool,
 ) -> anyhow::Result<Vec<(String, String)>> {
     let mut ret = Vec::new();
-    let available_packages = get_available_packages(repos, offline, unverified_ssl);
+    let available_packages = get_available_packages(repos, offline, unverified_ssl)?;
 
     if packages.is_empty() {
         let mut keys = available_packages
@@ -450,7 +439,7 @@ pub fn install_packages(
     cache_dir: &str,
     tmp_dir_prefix: &str,
 ) -> anyhow::Result<bool> {
-    let available_packages = get_available_packages(repos, offline, unverified_ssl);
+    let available_packages = get_available_packages(repos, offline, unverified_ssl)?;
 
     for p in &packages {
         let package_name = get_package_name(p);
@@ -1187,7 +1176,7 @@ pub fn update_packages(
         }
     }
 
-    let available_packages = get_available_packages(repos, offline, unverified_ssl);
+    let available_packages = get_available_packages(repos, offline, unverified_ssl)?;
 
     for pu in &mut package_updates {
         let Some(avail_pkg) = available_packages.get(&pu.name_new) else {
@@ -1245,11 +1234,7 @@ pub fn update_packages(
                     local_fn,
                 })
             })
-            .collect::<Vec<_>>();
-    let package_updates = package_updates
-        .into_iter()
-        .map(|x| x.unwrap())
-        .collect::<Vec<_>>();
+            .collect::<anyhow::Result<Vec<_>>>()?;
 
     //mb.clear();
     eprintln!();
