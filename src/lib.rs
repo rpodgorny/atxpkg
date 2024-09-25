@@ -457,7 +457,9 @@ pub fn install_packages(
     let mut urls_to_install = vec![];
     for p in &packages {
         let (package_name, package_version) = split_package_name_version(p);
-        let package_urls = available_packages.get(&package_name).unwrap(); // safe unwrap due to earlier check
+        let package_urls = available_packages
+            .get(&package_name)
+            .expect("safe unwrap due to earlier check");
         let url = if !package_version.is_empty() {
             get_specific_version_url(package_urls.clone(), &package_version)
         } else {
@@ -673,7 +675,7 @@ fn install_package(
     eprintln!();
 
     Ok(InstalledPackage {
-        t: Some(UNIX_EPOCH.elapsed().unwrap().as_secs_f64()),
+        t: Some(UNIX_EPOCH.elapsed()?.as_secs_f64()),
         version: version_new.clone(),
         md5sums,
         backup,
@@ -989,7 +991,7 @@ pub fn update_package(
     eprintln!();
 
     Ok(InstalledPackage {
-        t: Some(UNIX_EPOCH.elapsed().unwrap().as_secs_f64()),
+        t: Some(UNIX_EPOCH.elapsed()?.as_secs_f64()),
         version: version_new.clone(),
         md5sums,
         backup,
@@ -1186,11 +1188,11 @@ pub fn update_packages(
         if pu.version_new.is_empty() {
             pu.version_new = get_max_version(avail_pkg.clone()).unwrap();
         }
-        let url = get_specific_version_url(avail_pkg.clone(), &pu.version_new);
-        if url.clone().unwrap().is_empty() {
+        let url = get_specific_version_url(avail_pkg.clone(), &pu.version_new).unwrap();
+        if url.is_empty() {
             anyhow::bail!("package {}-{} not available", pu.name_new, pu.version_new);
         }
-        pu.url = url.unwrap();
+        pu.url = url;
     }
 
     package_updates
@@ -1257,7 +1259,7 @@ pub fn update_packages(
             tmp_dir_prefix,
         )?;
 
-        package_info.t = Some(UNIX_EPOCH.elapsed().unwrap().as_secs_f64());
+        package_info.t = Some(UNIX_EPOCH.elapsed()?.as_secs_f64());
         installed_packages.remove(&pu.name_old);
         installed_packages.insert(pu.name_new.clone(), package_info);
         log::info!(
