@@ -129,6 +129,7 @@ fn get_available_packages(
         .into_iter()
         .into_group_map();
 
+    //mb.clear();
     eprintln!();
 
     ret
@@ -494,6 +495,7 @@ pub fn install_packages(
         })
         .collect::<Vec<_>>();
 
+    //mb.clear();
     eprintln!();
 
     if download_only {
@@ -1243,6 +1245,7 @@ pub fn update_packages(
         .map(|x| x.unwrap())
         .collect::<Vec<_>>();
 
+    //mb.clear();
     eprintln!();
 
     if download_only {
