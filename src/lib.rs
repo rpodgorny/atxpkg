@@ -110,8 +110,11 @@ fn get_available_packages(
                 "{spinner} {prefix} [{wide_bar}] {bytes}/{total_bytes} ({bytes_per_sec})",
             );
             mb.add(pb.clone());
-            get_repo_listing(&repo, unverified_ssl, Some(&pb))
-                .unwrap()
+            let Ok(listing) = get_repo_listing(&repo, unverified_ssl, Some(&pb)) else {
+                pb.suspend(|| eprintln!("failed to get repo listing from {repo}"));
+                anyhow::bail!("failed to get repo listing from {repo}");
+            };
+            Ok(listing
                 .into_iter()
                 .filter_map(|url| {
                     let package_fn = get_package_fn(&url)?;
@@ -122,8 +125,9 @@ fn get_available_packages(
                     let package_name = get_package_name(&package_fn);
                     Some((package_name, url))
                 })
-                .collect::<Vec<_>>()
+                .collect::<Vec<_>>())
         })
+        .map(|x| x.unwrap())
         .flatten()
         .collect::<Vec<_>>()
         .into_iter()
