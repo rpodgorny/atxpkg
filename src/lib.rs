@@ -1220,19 +1220,26 @@ pub fn update_packages(
                 let pb = make_progress_bar(0, &pu.name_new,
                 "{spinner} {prefix} [{wide_bar}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})");
                 mb.add(pb.clone());
-                let local_fn =
+                let Ok(local_fn) =
                     download_package_if_needed(&pu.url, cache_dir, unverified_ssl, Some(&pb))
-                        .unwrap();
-                PackageUpdate {
+                else {
+                    pb.suspend(|| eprintln!("download failed"));
+                    anyhow::bail!("download failed");
+                };
+                Ok(PackageUpdate {
                     name_old: pu.name_old.clone(),
                     version_old: pu.version_old.clone(),
                     name_new: pu.name_new.clone(),
                     version_new: pu.version_new.clone(),
                     url: pu.url.clone(),
                     local_fn,
-                }
+                })
             })
             .collect::<Vec<_>>();
+    let package_updates = package_updates
+        .into_iter()
+        .map(|x| x.unwrap())
+        .collect::<Vec<_>>();
 
     eprintln!();
 
