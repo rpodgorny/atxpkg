@@ -689,10 +689,14 @@ fn get_md5_sum(file_path: &str) -> anyhow::Result<String> {
     Ok(hex::encode(hasher.finalize()))
 }
 
-fn unzip_to(zip_file: &str, output_dir: &str, progress_bar_prefix: &str) -> anyhow::Result<()> {
-    log::debug!("unzip {zip_file} to {output_dir}");
+fn unzip_to(
+    zip_file_path: &str,
+    output_dir: &str,
+    progress_bar_prefix: &str,
+) -> anyhow::Result<()> {
+    log::debug!("unzip {zip_file_path} to {output_dir}");
 
-    let mut archive = zip::read::ZipArchive::new(BufReader::new(File::open(zip_file)?))?;
+    let mut archive = zip::read::ZipArchive::new(BufReader::new(File::open(zip_file_path)?))?;
 
     let progress_bar = make_progress_bar(
         archive.len().try_into()?,
@@ -728,14 +732,17 @@ fn unzip_to(zip_file: &str, output_dir: &str, progress_bar_prefix: &str) -> anyh
         }
 
         // TODO: so i have to do this shit to get file times right - still, i don't like it
-        let mtime = file.last_modified().unwrap();
-        let stime = time::OffsetDateTime::try_from(mtime)?;
-        // TODO: getting local offset seems to fail on linux - solve somehow
-        let stime = stime.replace_offset(
-            time::UtcOffset::current_local_offset().unwrap_or(time::UtcOffset::UTC),
-        );
-        let ftime = filetime::FileTime::from_unix_time(stime.unix_timestamp(), 0);
-        filetime::set_file_times(&outpath, ftime, ftime)?;
+        if let Some(mtime) = file.last_modified() {
+            let stime = time::OffsetDateTime::try_from(mtime)?;
+            // TODO: getting local offset seems to fail on linux - solve somehow
+            let stime = stime.replace_offset(
+                time::UtcOffset::current_local_offset().unwrap_or(time::UtcOffset::UTC),
+            );
+            let ftime = filetime::FileTime::from_unix_time(stime.unix_timestamp(), 0);
+            filetime::set_file_times(&outpath, ftime, ftime)?;
+        } else {
+            log::warn!("failed to get file time for {}", as_unix_path(&outpath));
+        };
     }
 
     progress_bar.finish();
