@@ -55,16 +55,19 @@ fn move_file(from: &str, to: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn make_progress_bar(len: u64, prefix: &str, template: &str) -> indicatif::ProgressBar {
+fn make_progress_bar(
+    len: u64,
+    prefix: &str,
+    template: &str,
+) -> anyhow::Result<indicatif::ProgressBar> {
     let progress_bar = indicatif::ProgressBar::new(len).with_prefix(prefix.to_string());
     progress_bar.set_style(
         indicatif::ProgressStyle::default_bar()
-            .template(template)
-            .unwrap()
+            .template(template)?
             .tick_chars(r"|/-\ ")
             .progress_chars("##-"),
     );
-    progress_bar
+    Ok(progress_bar)
 }
 
 pub fn get_installed_packages(db_fn: &str) -> anyhow::Result<HashMap<String, InstalledPackage>> {
@@ -108,7 +111,7 @@ fn get_available_packages(
                 0,
                 &repo,
                 "{spinner} {prefix} [{wide_bar}] {bytes}/{total_bytes} ({bytes_per_sec})",
-            );
+            )?;
             mb.add(pb.clone());
             let Ok(listing) = get_repo_listing(&repo, unverified_ssl, Some(&pb)) else {
                 pb.suspend(|| eprintln!("failed to get repo listing from {repo}"));
@@ -479,7 +482,7 @@ pub fn install_packages(
             false => println!("install {package_name}-{package_version}"),
         }
     }
-    if no || !(yes || yes_no("continue?", "y")) {
+    if no || !(yes || yes_no("continue?", "y")?) {
         return Ok(false);
     }
 
@@ -493,11 +496,11 @@ pub fn install_packages(
                 0,
                 &package_name,
                 "{spinner} {prefix} [{wide_bar}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})",
-            );
+            )?;
             mb.add(pb.clone());
-            download_package_if_needed(&url, cache_dir, unverified_ssl, Some(&pb)).unwrap()
+            download_package_if_needed(&url, cache_dir, unverified_ssl, Some(&pb))
         })
-        .collect::<Vec<_>>();
+        .collect::<anyhow::Result<Vec<_>>>()?;
 
     //mb.clear();
     eprintln!();
@@ -517,11 +520,10 @@ pub fn install_packages(
     Ok(true)
 }
 
-fn yes_no(prompt: &str, default: &str) -> bool {
-    assert!(
-        !default.is_empty() || std::io::stdin().is_terminal(),
-        "Input is not a TTY"
-    );
+fn yes_no(prompt: &str, default: &str) -> anyhow::Result<bool> {
+    if default.is_empty() && std::io::stdin().is_terminal() {
+        anyhow::bail!("input is not a tty");
+    };
 
     let question = match default {
         "y" => format!("{prompt} [Y/n] "),
@@ -531,7 +533,7 @@ fn yes_no(prompt: &str, default: &str) -> bool {
 
     loop {
         print!("{question}");
-        std::io::stdout().flush().unwrap();
+        std::io::stdout().flush()?;
 
         let mut ans = String::new();
         std::io::stdin()
@@ -540,13 +542,13 @@ fn yes_no(prompt: &str, default: &str) -> bool {
         let ans = ans.trim().to_lowercase();
 
         match ans.as_str() {
-            "y" | "yes" => return true,
-            "n" | "no" => return false,
+            "y" | "yes" => return Ok(true),
+            "n" | "no" => return Ok(false),
             "" => {
                 if default == "y" {
-                    return true;
+                    return Ok(true);
                 } else if default == "n" {
-                    return false;
+                    return Ok(false);
                 }
             }
             _ => println!("Invalid input. Please enter 'y' or 'n'."),
@@ -624,7 +626,7 @@ fn install_package(
             files.len().try_into()?,
             &name,
             "{spinner} {prefix}: check [{wide_bar}] {pos}/{len}",
-        );
+        )?;
 
         for f in progress_bar.wrap_iter(files.iter()) {
             let target_fn = format!("{prefix}/{f}");
@@ -643,7 +645,7 @@ fn install_package(
         (dirs.len() + files.len()).try_into()?,
         &name,
         "{spinner} {prefix}: install [{wide_bar}] {pos}/{len}",
-    );
+    )?;
 
     for d in progress_bar.wrap_iter(dirs.into_iter().sorted_by_key(|x| x.len())) {
         let target_dir = format!("{prefix}/{d}");
@@ -710,7 +712,7 @@ fn unzip_to(zip_file: &str, output_dir: &str, progress_bar_prefix: &str) -> anyh
         archive.len().try_into()?,
         progress_bar_prefix,
         "{spinner} {prefix}: unzip [{wide_bar}] {pos}/{len}",
-    );
+    )?;
 
     for i in progress_bar.wrap_iter(0..archive.len()) {
         let mut file = archive.by_index(i)?;
@@ -815,7 +817,7 @@ pub fn update_package(
             files.len().try_into()?,
             &name,
             "{spinner} {prefix}: check [{wide_bar}] {pos}/{len}",
-        );
+        )?;
 
         for f in &files {
             let target_fn = format!("{prefix}/{f}");
@@ -834,7 +836,7 @@ pub fn update_package(
         (dirs.len() + files.len()).try_into()?,
         &name,
         "{spinner} {prefix}: update [{wide_bar}] {pos}/{len}",
-    );
+    )?;
 
     for d in progress_bar.wrap_iter(dirs.into_iter().sorted()) {
         let target_dir = format!("{prefix}/{d}");
@@ -933,7 +935,7 @@ pub fn update_package(
         (dirs_old.len() + files_old.len()).try_into()?,
         &name,
         "{spinner} {prefix}: cleanup [{wide_bar}] {pos}/{len}",
-    );
+    )?;
 
     for (fn_old, md5sum_old) in progress_bar.wrap_iter(files_old.into_iter()) {
         if md5sums.contains_key(&fn_old) {
@@ -1026,7 +1028,7 @@ pub fn remove_packages(
 
         println!("remove {package_name}-{package_version}");
     }
-    if no || !(yes || yes_no("continue?", "n")) {
+    if no || !(yes || yes_no("continue?", "n")?) {
         return Ok(false);
     }
 
@@ -1064,7 +1066,7 @@ pub fn remove_package(
         (dirs.len() + files.len()).try_into()?,
         package_name,
         "{spinner} {prefix}: remove [{wide_bar}] {pos}/{len}",
-    );
+    )?;
 
     for (file_name, md5sum) in progress_bar.wrap_iter(files.into_iter()) {
         let target_fn = format!("{prefix}/{file_name}");
@@ -1215,7 +1217,7 @@ pub fn update_packages(
             pu.name_old, pu.version_old, pu.name_new, pu.version_new
         );
     }
-    if no || !(yes || yes_no("continue?", "y")) {
+    if no || !(yes || yes_no("continue?", "y")?) {
         return Ok(false);
     }
 
@@ -1226,7 +1228,7 @@ pub fn update_packages(
             .par_iter()
             .map(|pu| {
                 let pb = make_progress_bar(0, &pu.name_new,
-                "{spinner} {prefix} [{wide_bar}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})");
+                "{spinner} {prefix} [{wide_bar}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})")?;
                 mb.add(pb.clone());
                 let Ok(local_fn) =
                     download_package_if_needed(&pu.url, cache_dir, unverified_ssl, Some(&pb))
@@ -1292,7 +1294,7 @@ fn check_package(package_name: &str, pkg: &InstalledPackage, prefix: &str) -> an
         pkg.md5sums.len().try_into()?,
         package_name,
         "{spinner} {prefix} [{wide_bar}] {pos}/{len}",
-    );
+    )?;
 
     let mut err_count = 0;
     for (fn_name, md5sum) in progress_bar.wrap_iter(pkg.md5sums.iter()) {
@@ -1397,7 +1399,7 @@ pub fn show_untracked(
             (dirs.len() + files.len()).try_into()?,
             &path,
             "{spinner} {prefix} [{wide_bar}] {pos}/{len}",
-        );
+        )?;
 
         for dir_name in progress_bar.wrap_iter(dirs.into_iter()) {
             let full_dir_name = format!("{path}/{dir_name}");
