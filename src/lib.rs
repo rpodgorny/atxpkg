@@ -129,7 +129,7 @@ fn get_available_packages(
         .into_iter()
         .into_group_map();
 
-    eprintln!("");
+    eprintln!();
 
     ret
 }
@@ -492,7 +492,7 @@ pub fn install_packages(
         })
         .collect::<Vec<_>>();
 
-    eprintln!("");
+    eprintln!();
 
     if download_only {
         return Ok(false);
@@ -626,7 +626,7 @@ fn install_package(
         }
 
         progress_bar.finish();
-        eprintln!("");
+        eprintln!();
     }
 
     let mut md5sums = HashMap::new();
@@ -670,7 +670,7 @@ fn install_package(
     }
 
     progress_bar.finish();
-    eprintln!("");
+    eprintln!();
 
     Ok(InstalledPackage {
         t: Some(UNIX_EPOCH.elapsed().unwrap().as_secs_f64()),
@@ -743,7 +743,7 @@ fn unzip_to(zip_file: &str, output_dir: &str, progress_bar_prefix: &str) -> anyh
     }
 
     progress_bar.finish();
-    eprintln!("");
+    eprintln!();
 
     log::debug!("done unzipping");
     Ok(())
@@ -817,7 +817,7 @@ pub fn update_package(
         }
 
         progress_bar.finish();
-        eprintln!("");
+        eprintln!();
     }
 
     let mut md5sums = HashMap::new();
@@ -910,7 +910,7 @@ pub fn update_package(
     }
 
     progress_bar.finish();
-    eprintln!("");
+    eprintln!();
 
     let (mut dirs_old, mut files_old) = (vec![], vec![]);
     for (fn_or_dir_old, md5sum_old) in installed_package.md5sums.into_iter() {
@@ -986,7 +986,7 @@ pub fn update_package(
     }
 
     progress_bar.finish();
-    eprintln!("");
+    eprintln!();
 
     Ok(InstalledPackage {
         t: Some(UNIX_EPOCH.elapsed().unwrap().as_secs_f64()),
@@ -1110,7 +1110,7 @@ pub fn remove_package(
     }
 
     progress_bar.finish();
-    eprintln!("");
+    eprintln!();
 
     Ok(())
 }
@@ -1234,7 +1234,7 @@ pub fn update_packages(
             })
             .collect::<Vec<_>>();
 
-    eprintln!("");
+    eprintln!();
 
     if download_only {
         return Ok(false);
@@ -1299,7 +1299,7 @@ fn check_package(package_name: &str, pkg: &InstalledPackage, prefix: &str) -> an
     }
 
     progress_bar.finish();
-    eprintln!("");
+    eprintln!();
 
     for r in res {
         println!("{r}");
@@ -1397,7 +1397,7 @@ pub fn show_untracked(
         }
 
         progress_bar.finish();
-        eprintln!("");
+        eprintln!();
     }
 
     Ok(())
