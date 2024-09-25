@@ -175,15 +175,15 @@ fn get_repo_listing_http(
 
     let total_size = resp.content_length().unwrap_or(0);
 
-    let mut reader: Box<dyn std::io::Read> = Box::new(resp);
-
-    if let Some(pb) = progress_bar {
+    let mut reader: Box<dyn std::io::Read> = if let Some(pb) = progress_bar {
         pb.set_length(total_size);
         pb.enable_steady_tick(Duration::from_millis(200));
-        reader = Box::new(pb.wrap_read(reader));
-    }
+        Box::new(pb.wrap_read(resp))
+    } else {
+        Box::new(resp)
+    };
 
-    let mut body = String::new();
+    let mut body = String::with_capacity(total_size.try_into()?);
     reader.read_to_string(&mut body)?;
 
     let re = lazy_regex::regex!(r#"href\s*=\s*["']?([^"'\s>]+)["']?"#);
