@@ -309,9 +309,9 @@ fn main_sub() -> anyhow::Result<u8> {
         }
         Command::ListInstalled => {
             let installed_packages = get_installed_packages(&db_fn)?;
-            let sorted_iter = installed_packages.iter().sorted_unstable_by_key(|t| t.0);
-
-            for (package_name, package_info) in sorted_iter {
+            for (package_name, package_info) in
+                installed_packages.iter().sorted_unstable_by_key(|x| x.0)
+            {
                 println!("{package_name}-{}", package_info.version);
             }
         }
