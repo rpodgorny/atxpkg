@@ -360,6 +360,7 @@ pub fn list_available(
                 ret.push((p.clone(), version.clone()));
             }
         }
+        ret.sort_unstable();
     }
     Ok(ret)
 }

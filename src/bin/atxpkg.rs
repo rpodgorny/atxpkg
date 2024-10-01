@@ -2,6 +2,7 @@ use std::{path::Path, process::ExitCode};
 
 use atxpkg::*;
 use clap::{Args, Parser, Subcommand};
+use itertools::Itertools;
 
 #[derive(Debug, Parser)]
 #[command(version = env!("CARGO_PKG_VERSION"))]
@@ -308,7 +309,9 @@ fn main_sub() -> anyhow::Result<u8> {
         }
         Command::ListInstalled => {
             let installed_packages = get_installed_packages(&db_fn)?;
-            for (package_name, package_info) in &installed_packages {
+            let sorted_iter = installed_packages.iter().sorted_unstable_by_key(|t| t.0);
+
+            for (package_name, package_info) in sorted_iter {
                 println!("{package_name}-{}", package_info.version);
             }
         }
