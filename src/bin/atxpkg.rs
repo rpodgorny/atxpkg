@@ -239,7 +239,11 @@ fn main_sub() -> anyhow::Result<u8> {
                 )?;
             }
             let packages = if args.packages.is_empty() {
-                installed_packages.keys().map(|x| x.to_string()).collect()
+                installed_packages
+                    .keys()
+                    .map(|x| x.to_string())
+                    .sorted()
+                    .collect()
             } else {
                 args.packages.to_vec()
             };
@@ -287,7 +291,11 @@ fn main_sub() -> anyhow::Result<u8> {
         Command::Check(args) => {
             let installed_packages = get_installed_packages(&db_fn)?;
             let packages = if args.packages.is_empty() {
-                installed_packages.keys().map(|x| x.to_string()).collect()
+                installed_packages
+                    .keys()
+                    .map(|x| x.to_string())
+                    .sorted()
+                    .collect()
             } else {
                 args.packages.to_vec()
             };
