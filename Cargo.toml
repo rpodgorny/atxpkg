@@ -4,7 +4,7 @@ version = "10.4.0"
 edition = "2021"
 
 [dependencies]
-anyhow = { version = "1.0.89", features = ["backtrace"] }
+anyhow = { version = "1.0.92", features = ["backtrace"] }
 clap = { version = "4.5.20", features = ["derive"] }
 filetime = "0.2.25"
 glob = "0.3.1"
@@ -16,9 +16,9 @@ log = "0.4.22"
 log-panics = { version = "2.1.0", features = ["with-backtrace"] }
 md-5 = "0.10.6"
 rayon = "1.10.0"
-reqwest = { version = "0.12.8", features = ["blocking", "native-tls-vendored", "rustls-tls"] }
-serde = { version = "1.0.210", features = ["derive"] }
-serde_json = "1.0.128"
+reqwest = { version = "0.12.9", features = ["blocking", "native-tls-vendored", "rustls-tls"] }
+serde = { version = "1.0.214", features = ["derive"] }
+serde_json = "1.0.132"
 simplelog = "0.12.2"
 tempfile = "3.13.0"
 time = { version = "0.3.36", features = ["local-offset", "macros"] }
