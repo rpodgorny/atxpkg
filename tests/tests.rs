@@ -19,6 +19,19 @@ fn test_list_available() {
 }
 
 #[test]
+fn test_clean_cache() {
+    let tmp_dir = tempfile::Builder::new().tempdir().unwrap();
+    let fn_ = format!("{}/some_file", tmp_dir.path().to_str().unwrap());
+    std::fs::write(&fn_, "test").unwrap();
+
+    assert!(Path::new(&fn_).exists());
+    atxpkg::clean_cache(tmp_dir.path().to_str().unwrap()).unwrap();
+    assert!(!Path::new(&fn_).exists());
+
+    assert!(atxpkg::clean_cache("NON_EXISTENT").is_err());
+}
+
+#[test]
 fn test_install_packages() {
     let dest_dir = tempfile::Builder::new().tempdir().unwrap();
     let dest_dir_str = dest_dir.path().to_str().unwrap();
