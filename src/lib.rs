@@ -1358,11 +1358,11 @@ fn gen_fn_to_package_name_mapping(
     fn_to_package_name
 }
 
-pub fn show_untracked(
+pub fn get_untracked(
     paths: Vec<String>,
     installed_packages: &HashMap<String, InstalledPackage>,
     prefix: &str,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Vec<String>> {
     let fn_to_package_name = gen_fn_to_package_name_mapping(installed_packages);
 
     let paths = if paths.is_empty() {
@@ -1381,6 +1381,8 @@ pub fn show_untracked(
         paths
     };
 
+    let mut ret = Vec::new();
+
     for path in paths.into_iter() {
         let full_path = format!("{prefix}/{path}");
         let (dirs, files) = get_recursive_listing(&full_path)?;
@@ -1394,13 +1396,13 @@ pub fn show_untracked(
         for dir_name in progress_bar.wrap_iter(dirs.into_iter()) {
             let full_dir_name = format!("{path}/{dir_name}");
             if !fn_to_package_name.contains_key(&full_dir_name) {
-                println!("unknown: {full_dir_name}");
+                ret.push(full_dir_name);
             }
         }
         for fn_name in progress_bar.wrap_iter(files.into_iter()) {
             let full_fn_name = format!("{path}/{fn_name}");
             if !fn_to_package_name.contains_key(&full_fn_name) {
-                println!("unknown: {full_fn_name}");
+                ret.push(full_fn_name);
             }
         }
 
@@ -1408,7 +1410,7 @@ pub fn show_untracked(
         eprintln!();
     }
 
-    Ok(())
+    Ok(ret)
 }
 
 #[cfg(test)]
@@ -1570,5 +1572,33 @@ mod tests {
         assert!(Path::new(&format!("{dest_dir_str}/test/protected2.atxpkg_backup")).exists());
         assert!(!Path::new(&format!("{dest_dir_str}/test/protected3.atxpkg_backup")).exists());
         assert!(!Path::new(&format!("{dest_dir_str}/test/unprotected.atxpkg_backup")).exists());
+    }
+
+    #[test]
+    fn test_get_untracked() {
+        let dest_dir = tempfile::Builder::new().tempdir().unwrap();
+        let dest_dir_str = dest_dir.path().to_str().unwrap();
+        let tmp_dir = tempfile::Builder::new().tempdir().unwrap();
+
+        let pkginfo = install_package(
+            "./test_data/test-1.0-1.atxpkg.zip",
+            dest_dir_str,
+            false,
+            tmp_dir.path().to_str().unwrap(),
+        )
+        .unwrap();
+
+        let mut installed_packages = HashMap::new();
+        installed_packages.insert("test".to_string(), pkginfo);
+
+        let untracked =
+            get_untracked(vec!["test".to_string()], &installed_packages, dest_dir_str).unwrap();
+        assert!(untracked.is_empty());
+
+        std::fs::write(format!("{dest_dir_str}/test/extra_file"), "some content").unwrap();
+
+        let untracked =
+            get_untracked(vec!["test".to_string()], &installed_packages, dest_dir_str).unwrap();
+        assert_eq!(untracked, vec!["test/extra_file".to_string()]);
     }
 }

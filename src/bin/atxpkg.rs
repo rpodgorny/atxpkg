@@ -325,7 +325,11 @@ fn main_sub() -> anyhow::Result<u8> {
         }
         Command::ShowUntracked(args) => {
             let installed_packages = get_installed_packages(&db_fn)?;
-            show_untracked(args.paths.clone(), &installed_packages, &mainargs.prefix)?;
+            let untracked =
+                get_untracked(args.paths.clone(), &installed_packages, &mainargs.prefix)?;
+            for x in untracked {
+                println!("unknown: {x}");
+            }
         }
         Command::CleanCache => {
             clean_cache(&cache_dir)?;
