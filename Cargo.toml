@@ -2,6 +2,8 @@
 name = "atxpkg"
 version = "10.4.0"
 edition = "2021"
+license = "PROPRIETARY"
+authors = ["Radek Podgorny <radek@podgorny.cz>"]
 
 [dependencies]
 anyhow = { version = "1.0.93", features = ["backtrace"] }
