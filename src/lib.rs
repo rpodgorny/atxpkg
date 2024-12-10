@@ -1,12 +1,13 @@
 use itertools::Itertools;
 use md5::{Digest, Md5};
-use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufReader, BufWriter, IsTerminal, Read, Write};
 use std::path::Path;
 use std::time::{Duration, UNIX_EPOCH};
+
+const MAX_CONCURRENT_DOWNLOADS: u32 = 2;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct InstalledPackage {
@@ -103,35 +104,51 @@ fn get_available_packages(
 
     let mb = indicatif::MultiProgress::new();
 
-    let ret = repos
-        .into_par_iter()
-        .filter(|repo| !offline || !is_url(repo))
-        .map(|repo| {
-            let pb = make_progress_bar(
-                0,
-                &repo,
-                "{spinner} {prefix} [{wide_bar}] {bytes}/{total_bytes} ({bytes_per_sec})",
-            )?;
-            mb.add(pb.clone());
-            let listing = get_repo_listing(&repo, unverified_ssl, Some(&pb));
-            pb.finish();
-            Ok(listing?
-                .into_iter()
-                .filter_map(|url| {
-                    let package_fn = get_package_fn(&url)?;
-                    if !is_valid_package_fn(&package_fn) {
-                        log::warn!("{package_fn} not a valid package filename");
-                        return None;
-                    }
-                    let package_name = get_package_name(&package_fn);
-                    Some((package_name, url))
-                })
-                .collect::<Vec<_>>())
-        })
-        .collect::<anyhow::Result<Vec<_>>>()?
-        .into_iter()
-        .flatten()
-        .into_group_map();
+    let ret = {
+        let (tx, rx) = std::sync::mpsc::channel();
+        scoped_threadpool::Pool::new(MAX_CONCURRENT_DOWNLOADS).scoped(|scope| {
+            for repo in repos {
+                if offline && is_url(&repo) {
+                    continue;
+                }
+                let tx = &tx;
+                let mb = &mb;
+                scope.execute(move || {
+                    let res = (|| {
+                        let pb = make_progress_bar(
+                        0,
+                        &repo,
+                        "{spinner} {prefix} [{wide_bar}] {bytes}/{total_bytes} ({bytes_per_sec})",
+                    )?;
+                        mb.add(pb.clone());
+                        let listing = get_repo_listing(&repo, unverified_ssl, Some(&pb));
+                        pb.finish();
+                        anyhow::Ok(
+                            listing?
+                                .into_iter()
+                                .filter_map(|url| {
+                                    let package_fn = get_package_fn(&url)?;
+                                    if !is_valid_package_fn(&package_fn) {
+                                        log::warn!("{package_fn} not a valid package filename");
+                                        return None;
+                                    }
+                                    let package_name = get_package_name(&package_fn);
+                                    Some((package_name, url))
+                                })
+                                .collect::<Vec<_>>(),
+                        )
+                    })();
+                    tx.send(res).unwrap();
+                });
+            }
+        });
+        drop(tx);
+        let ret: Vec<_> = rx.iter().try_collect()?;
+        anyhow::Ok(ret)
+    }?
+    .into_iter()
+    .flatten()
+    .into_group_map();
 
     //mb.clear();
     eprintln!();
@@ -482,19 +499,31 @@ pub fn install_packages(
 
     let mb = indicatif::MultiProgress::new();
 
-    let local_fns_to_install = urls_to_install
-        .into_par_iter()
-        .map(|url| {
-            let package_name = get_package_name(&get_package_fn(&url).unwrap());
-            let pb = make_progress_bar(
-                0,
-                &package_name,
-                "{spinner} {prefix} [{wide_bar}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})",
-            )?;
-            mb.add(pb.clone());
-            download_package_if_needed(&url, cache_dir, unverified_ssl, Some(&pb))
-        })
-        .collect::<anyhow::Result<Vec<_>>>()?;
+    let local_fns_to_install = {
+        let (tx, rx) = std::sync::mpsc::channel();
+        scoped_threadpool::Pool::new(MAX_CONCURRENT_DOWNLOADS).scoped(|scope| {
+            for url in &urls_to_install {
+                let tx = &tx;
+                let mb = &mb;
+                scope.execute(move || {
+                    let res = (|| {
+                        let package_name = get_package_name(&get_package_fn(url).unwrap());
+                        let pb = make_progress_bar(
+                            0,
+                            &package_name,
+                            "{spinner} {prefix} [{wide_bar}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})",
+                        )?;
+                        mb.add(pb.clone());
+                        download_package_if_needed(url, cache_dir, unverified_ssl, Some(&pb))
+                    })();
+                    tx.send(res).unwrap();
+                });
+            }
+        });
+        drop(tx);
+        let local_fns_to_install: Vec<_> = rx.iter().try_collect()?;
+        anyhow::Ok(local_fns_to_install)
+    }?;
 
     //mb.clear();
     eprintln!();
@@ -1224,29 +1253,40 @@ pub fn update_packages(
 
     let mb = indicatif::MultiProgress::new();
 
-    let package_updates =
-        package_updates
-            .par_iter()
-            .map(|pu| {
-                let pb = make_progress_bar(0, &pu.name_new,
-                "{spinner} {prefix} [{wide_bar}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})")?;
-                mb.add(pb.clone());
-                let Ok(local_fn) =
-                    download_package_if_needed(&pu.url, cache_dir, unverified_ssl, Some(&pb))
-                else {
-                    pb.suspend(|| eprintln!("download failed"));
-                    anyhow::bail!("download failed");
-                };
-                Ok(PackageUpdate {
-                    name_old: pu.name_old.clone(),
-                    version_old: pu.version_old.clone(),
-                    name_new: pu.name_new.clone(),
-                    version_new: pu.version_new.clone(),
-                    url: pu.url.clone(),
-                    local_fn,
-                })
-            })
-            .collect::<anyhow::Result<Vec<_>>>()?;
+    let package_updates = {
+        let (tx, rx) = std::sync::mpsc::channel();
+        scoped_threadpool::Pool::new(MAX_CONCURRENT_DOWNLOADS).scoped(|scope| {
+            for pu in &package_updates {
+                let tx = &tx;
+                let mb = &mb;
+                scope.execute(move || {
+                    let res = (|| {
+                        let pb = make_progress_bar(0, &pu.name_new,
+                        "{spinner} {prefix} [{wide_bar}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})")?;
+                        mb.add(pb.clone());
+                        let Ok(local_fn) =
+                            download_package_if_needed(&pu.url, cache_dir, unverified_ssl, Some(&pb))
+                        else {
+                            pb.suspend(|| eprintln!("download failed"));
+                            anyhow::bail!("download failed");
+                        };
+                        Ok(PackageUpdate {
+                            name_old: pu.name_old.clone(),
+                            version_old: pu.version_old.clone(),
+                            name_new: pu.name_new.clone(),
+                            version_new: pu.version_new.clone(),
+                            url: pu.url.clone(),
+                            local_fn,
+                        })
+                    })();
+                    tx.send(res).unwrap();
+                });
+            };
+        });
+        drop(tx);
+        let package_updates: Vec<_> = rx.iter().try_collect()?;
+        anyhow::Ok(package_updates)
+    }?;
 
     //mb.clear();
     eprintln!();
