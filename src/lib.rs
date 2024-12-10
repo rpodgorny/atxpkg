@@ -116,10 +116,10 @@ fn get_available_packages(
                 scope.execute(move || {
                     let res = (|| {
                         let pb = make_progress_bar(
-                        0,
-                        &repo,
-                        "{spinner} {prefix} [{wide_bar}] {bytes}/{total_bytes} ({bytes_per_sec})",
-                    )?;
+                            0,
+                            &repo,
+                            "{spinner} {prefix} [{wide_bar}] {bytes}/{total_bytes} ({bytes_per_sec})",
+                        )?;
                         mb.add(pb.clone());
                         let listing = get_repo_listing(&repo, unverified_ssl, Some(&pb));
                         pb.finish();
@@ -1261,8 +1261,11 @@ pub fn update_packages(
                 let mb = &mb;
                 scope.execute(move || {
                     let res = (|| {
-                        let pb = make_progress_bar(0, &pu.name_new,
-                        "{spinner} {prefix} [{wide_bar}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})")?;
+                        let pb = make_progress_bar(
+                            0,
+                            &pu.name_new,
+                            "{spinner} {prefix} [{wide_bar}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})",
+                        )?;
                         mb.add(pb.clone());
                         let Ok(local_fn) =
                             download_package_if_needed(&pu.url, cache_dir, unverified_ssl, Some(&pb))
