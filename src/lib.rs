@@ -203,7 +203,14 @@ fn get_repo_listing_dir(
 ) -> anyhow::Result<Vec<String>> {
     let mut ret = Vec::new();
 
-    for entry in walkdir::WalkDir::new(path).into_iter() {
+    let walker = walkdir::WalkDir::new(path).into_iter();
+    let iter: Box<dyn Iterator<Item = _>> = if let Some(pb) = progress_bar {
+        pb.enable_steady_tick(Duration::from_millis(200));
+        Box::new(pb.wrap_iter(walker))
+    } else {
+        Box::new(walker)
+    };
+    for entry in iter {
         let entry = entry?;
         if entry.file_type().is_dir() {
             continue;
