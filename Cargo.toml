@@ -6,8 +6,8 @@ license = "PROPRIETARY"
 authors = ["Radek Podgorny <radek@podgorny.cz>"]
 
 [dependencies]
-anyhow = { version = "1.0.93", features = ["backtrace"] }
-clap = { version = "4.5.21", features = ["derive"] }
+anyhow = { version = "1.0.94", features = ["backtrace"] }
+clap = { version = "4.5.23", features = ["derive"] }
 filetime = "0.2.25"
 glob = "0.3.1"
 hex = "0.4.3"
@@ -23,9 +23,9 @@ serde = { version = "1.0.215", features = ["derive"] }
 serde_json = "1.0.133"
 simplelog = "0.12.2"
 tempfile = "3.14.0"
-time = { version = "0.3.36", features = ["local-offset", "macros"] }
+time = { version = "0.3.37", features = ["local-offset", "macros"] }
 walkdir = "2.5.0"
-zip = { version = "2.2.0", features = ["time"] }
+zip = { version = "2.2.1", features = ["time"] }
 
 [profile.release.package."*"]
 debug = false
