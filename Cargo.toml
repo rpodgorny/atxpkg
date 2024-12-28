@@ -1,6 +1,6 @@
 [package]
 name = "atxpkg"
-version = "10.5.1"
+version = "10.5.0"
 edition = "2021"
 license = "PROPRIETARY"
 authors = ["Radek Podgorny <radek@podgorny.cz>"]
