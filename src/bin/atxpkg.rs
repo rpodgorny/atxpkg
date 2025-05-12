@@ -162,7 +162,7 @@ fn main_sub() -> anyhow::Result<u8> {
 
     let log_fn = format!("{root_dir}/atxpkg.log");
 
-    log_init(Some(&log_fn), Some("debug"), mainargs.debug).unwrap();
+    log_init(Some(&log_fn), Some("debug"), mainargs.debug)?;
 
     log::info!("starting atxpkg v{}", env!("CARGO_PKG_VERSION"));
     eprintln!("starting atxpkg v{}", env!("CARGO_PKG_VERSION"));
