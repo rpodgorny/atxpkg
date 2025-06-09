@@ -2,6 +2,7 @@ __pycache__
 /*.atxpkg.zip
 htmlcov
 .coverage
+mutants.out*
 
 
 # Added by cargo
