@@ -167,7 +167,7 @@ fn main_sub() -> anyhow::Result<u8> {
     log::info!("starting atxpkg v{}", env!("CARGO_PKG_VERSION"));
     eprintln!("starting atxpkg v{}", env!("CARGO_PKG_VERSION"));
 
-    log::debug!("args: {:#?}", mainargs);
+    log::debug!("args: {mainargs:#?}");
 
     if !Path::new(root_dir).exists() {
         return Err(anyhow::anyhow!("root dir {root_dir} does not exist"));

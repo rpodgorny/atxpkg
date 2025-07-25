@@ -272,7 +272,7 @@ fn download_package_if_needed(
             && resp
                 .headers()
                 .get("Accept-Ranges")
-                .map_or(false, |v| v == "bytes")
+                .is_some_and(|v| v == "bytes")
         {
             if let Ok(metadata) = std::fs::metadata(&fn_temp) {
                 resume_from = metadata.len();
@@ -287,7 +287,7 @@ fn download_package_if_needed(
 
     if resume_from > 0 {
         log::info!("resuming from {resume_from}");
-        req = req.header(reqwest::header::RANGE, format!("bytes={}-", resume_from));
+        req = req.header(reqwest::header::RANGE, format!("bytes={resume_from}-"));
     }
 
     let resp = req.send()?;
@@ -1582,7 +1582,7 @@ mod tests {
             "./test_data/test-2.0-1.atxpkg.zip",
             "test",
             pkginfo,
-            &dest_dir_str,
+            dest_dir_str,
             false,
             tmp_dir.path().to_str().unwrap(),
         )
@@ -1616,7 +1616,7 @@ mod tests {
         std::fs::write(format!("{dest_dir_str}/test/protected2"), "2\n").unwrap();
         std::fs::write(format!("{dest_dir_str}/test/unprotected2"), "2\n").unwrap();
 
-        let _ = remove_package("test", pkginfo, dest_dir_str).unwrap();
+        remove_package("test", pkginfo, dest_dir_str).unwrap();
 
         assert!(Path::new(&format!("{dest_dir_str}/test/protected1.atxpkg_backup")).exists());
         assert!(Path::new(&format!("{dest_dir_str}/test/protected2.atxpkg_backup")).exists());
