@@ -7,8 +7,8 @@ license = "PROPRIETARY"
 authors = ["Radek Podgorny <radek@podgorny.cz>"]
 
 [dependencies]
-anyhow = { version = "1.0.98", features = ["backtrace"] }
-clap = { version = "4.5.43", features = ["derive"] }
+anyhow = { version = "1.0.99", features = ["backtrace"] }
+clap = { version = "4.5.45", features = ["derive"] }
 filetime = "0.2.25"
 hex = "0.4.3"
 indicatif = "0.18.0"
@@ -17,7 +17,7 @@ lazy-regex = "3.4.1"
 log = "0.4.27"
 log-panics = { version = "2.1.0", features = ["with-backtrace"] }
 md-5 = "0.10.6"
-reqwest = { version = "0.12.22", features = ["blocking", "native-tls-vendored", "rustls-tls"] }
+reqwest = { version = "0.12.23", features = ["blocking", "native-tls-vendored", "rustls-tls"] }
 scoped_threadpool = "0.1.9"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.142"
