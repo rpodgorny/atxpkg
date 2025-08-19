@@ -27,6 +27,8 @@ enum Command {
     Install(InstallArgs),
     /// Update packages.
     Update(InstallArgs),
+    /// Install or update packages (install if not installed, update if installed).
+    Upstall(InstallArgs),
     /// Remove packages.
     Remove(InstallArgs),
     /// Check packages.
@@ -265,6 +267,34 @@ fn main_sub() -> anyhow::Result<u8> {
             if res? {
                 log::info!("update completed");
                 println!("update completed");
+            }
+        }
+        Command::Upstall(args) => {
+            let mut installed_packages = get_installed_packages(&db_fn)?;
+            if let Some(if_installed_) = &args.if_installed {
+                if_installed(
+                    if_installed_.split(',').map(|x| x.to_string()).collect(),
+                    &installed_packages,
+                )?;
+            }
+            let res = upstall_packages(
+                args.packages.to_vec(),
+                &mut installed_packages,
+                &mainargs.prefix,
+                repos,
+                args.force,
+                args.offline,
+                args.yes,
+                args.no,
+                args.downloadonly,
+                args.unverified_ssl,
+                &cache_dir,
+                &tmp_dir_prefix,
+            );
+            save_installed_packages(&installed_packages, &db_fn)?;
+            if res? {
+                log::info!("upstall completed");
+                println!("upstall completed");
             }
         }
         Command::Remove(args) => {

@@ -1327,6 +1327,73 @@ pub fn update_packages(
     Ok(true)
 }
 
+pub fn upstall_packages(
+    packages: Vec<String>,
+    installed_packages: &mut HashMap<String, InstalledPackage>,
+    prefix: &str,
+    repos: Vec<String>,
+    force: bool,
+    offline: bool,
+    yes: bool,
+    no: bool,
+    download_only: bool,
+    unverified_ssl: bool,
+    cache_dir: &str,
+    tmp_dir_prefix: &str,
+) -> anyhow::Result<bool> {
+    let mut packages_to_install = Vec::new();
+    let mut packages_to_update = Vec::new();
+
+    for package in &packages {
+        let package_name = get_package_name(package);
+        if installed_packages.contains_key(&package_name) {
+            packages_to_update.push(package.clone());
+        } else {
+            packages_to_install.push(package.clone());
+        }
+    }
+
+    let mut operation_occurred = false;
+
+    if !packages_to_install.is_empty() {
+        let install_result = install_packages(
+            packages_to_install,
+            installed_packages,
+            prefix,
+            repos.clone(),
+            force,
+            offline,
+            yes,
+            no,
+            download_only,
+            unverified_ssl,
+            cache_dir,
+            tmp_dir_prefix,
+        )?;
+        operation_occurred = install_result || operation_occurred;
+    }
+
+    if !packages_to_update.is_empty() {
+        let update_result = update_packages(
+            packages_to_update,
+            installed_packages,
+            prefix,
+            repos,
+            force,
+            offline,
+            yes,
+            no,
+            download_only,
+            unverified_ssl,
+            cache_dir,
+            tmp_dir_prefix,
+        )?;
+        operation_occurred = update_result || operation_occurred;
+    }
+
+    Ok(operation_occurred)
+}
+
 fn check_package(package_name: &str, pkg: &InstalledPackage, prefix: &str) -> anyhow::Result<u32> {
     let mut res = vec![];
 
