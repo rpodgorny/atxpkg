@@ -138,12 +138,32 @@ fn get_available_packages(
                                 .collect::<Vec<_>>(),
                         )
                     })();
-                    tx.send(res).unwrap();
+                    tx.send((repo.clone(), res)).unwrap();
                 });
             }
         });
         drop(tx);
-        let ret: Vec<_> = rx.iter().try_collect()?;
+        let mut ret = Vec::new();
+        let mut failed_repos = Vec::new();
+
+        for (repo, result) in rx.iter() {
+            match result {
+                Ok(packages) => ret.push(packages),
+                Err(err) => {
+                    log::warn!("Failed to read repository {}: {}", repo, err);
+                    failed_repos.push(format!("{}: {}", repo, err));
+                }
+            }
+        }
+
+        if !failed_repos.is_empty() {
+            log::warn!("Failed to read from {} repositories, package list may be incomplete", failed_repos.len());
+            eprintln!("WARNING: Failed to read from some repositories. Package list may be incomplete.");
+            for repo_err in &failed_repos {
+                eprintln!("  {}", repo_err);
+            }
+        }
+
         anyhow::Ok(ret)
     }?
     .into_iter()
