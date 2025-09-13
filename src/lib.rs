@@ -8,6 +8,7 @@ use std::path::Path;
 use std::time::{Duration, UNIX_EPOCH};
 
 const MAX_CONCURRENT_DOWNLOADS: u32 = 2;
+const MD5_BUFFER_SIZE: usize = 1024 * 1024; // 1MB buffer for MD5 calculation
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct InstalledPackage {
@@ -220,7 +221,7 @@ fn get_repo_listing_http(
         Box::new(resp)
     };
 
-    let mut body = String::with_capacity(total_size.try_into()?);
+    let mut body = String::with_capacity(total_size.try_into().unwrap_or(8192));
     reader.read_to_string(&mut body)?;
 
     let re = lazy_regex::regex!(r#"href\s*=\s*["']?([^"'\s>]+)["']?"#);
@@ -493,7 +494,7 @@ pub fn install_packages(
         }
     }
 
-    let mut urls_to_install = vec![];
+    let mut urls_to_install = Vec::with_capacity(packages.len());
     for p in &packages {
         let (package_name, package_version) = split_package_name_version(p);
         let package_urls = available_packages
@@ -682,7 +683,7 @@ fn install_package(
         eprintln!();
     }
 
-    let mut md5sums = HashMap::new();
+    let mut md5sums = HashMap::with_capacity(dirs.len() + files.len());
 
     let progress_bar = make_progress_bar(
         (dirs.len() + files.len()).try_into()?,
@@ -735,7 +736,7 @@ fn install_package(
 
 fn get_md5_sum(file_path: &str) -> anyhow::Result<String> {
     let mut hasher = Md5::new();
-    let mut buffer = [0u8; 1024 * 1024];
+    let mut buffer = [0u8; MD5_BUFFER_SIZE];
     let mut reader = BufReader::new(File::open(file_path)?);
     while let Ok(size) = reader.read(&mut buffer) {
         hasher.update(&buffer[..size]);
@@ -810,7 +811,8 @@ fn unzip_to(
 }
 
 fn get_recursive_listing(path_base: &str) -> anyhow::Result<(Vec<String>, Vec<String>)> {
-    let (mut ret_dirs, mut ret_files) = (Vec::new(), Vec::new());
+    // Pre-allocate with reasonable initial capacity
+    let (mut ret_dirs, mut ret_files) = (Vec::with_capacity(32), Vec::with_capacity(128));
 
     for entry in walkdir::WalkDir::new(path_base) {
         let entry = entry?;
@@ -880,7 +882,7 @@ pub fn update_package(
         eprintln!();
     }
 
-    let mut md5sums = HashMap::new();
+    let mut md5sums = HashMap::with_capacity(dirs.len() + files.len());
 
     let progress_bar = make_progress_bar(
         (dirs.len() + files.len()).try_into()?,
