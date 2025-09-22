@@ -1736,8 +1736,31 @@ mod tests {
 
         std::fs::write(format!("{dest_dir_str}/test/extra_file"), "some content").unwrap();
 
+        // test with expected directory
         let untracked =
             get_untracked(vec!["test".to_string()], &installed_packages, dest_dir_str).unwrap();
         assert_eq!(untracked, vec!["test/extra_file".to_string()]);
+
+        // test with no directory specified
+        let untracked = get_untracked(vec![], &installed_packages, dest_dir_str).unwrap();
+        assert_eq!(untracked, vec!["test/extra_file".to_string()]);
+
+        // test with untracked directory
+        std::fs::create_dir_all(format!("{dest_dir_str}/untracked/extra_file")).unwrap();
+        let untracked = get_untracked(
+            vec!["untracked".to_string()],
+            &installed_packages,
+            dest_dir_str,
+        )
+        .unwrap();
+        assert_eq!(untracked, vec!["untracked/extra_file".to_string()]);
+
+        // test with non-existent directory
+        let result = get_untracked(
+            vec!["nonexistent".to_string()],
+            &installed_packages,
+            dest_dir_str,
+        );
+        assert!(result.is_err());
     }
 }
