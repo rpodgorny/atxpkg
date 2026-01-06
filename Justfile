@@ -6,7 +6,7 @@ coverage:
 
 audit:
   cargo audit
-  osv-scanner .
+  osv-scanner -r .
 
 mutants:
   cargo mutants --test-tool=nextest -j 4

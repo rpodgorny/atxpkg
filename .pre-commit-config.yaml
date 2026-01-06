@@ -60,11 +60,3 @@ repos:
     rev: v8.28.0
     hooks:
       - id: gitleaks
-
-  - repo: https://github.com/google/osv-scanner
-    rev: v2.2.2
-    hooks:
-      - id: osv-scanner
-        args:
-          - "-r"
-          - "."
