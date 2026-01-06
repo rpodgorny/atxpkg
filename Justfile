@@ -4,6 +4,9 @@ test:
 coverage:
   cargo llvm-cov nextest --text
 
+audit:
+  cargo audit
+
 mutants:
   cargo mutants --test-tool=nextest -j 4
 
