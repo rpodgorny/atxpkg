@@ -1577,6 +1577,25 @@ mod tests {
     }
 
     #[test]
+    fn test_is_valid_package_fn() {
+        assert!(is_valid_package_fn("my-package-1.0.0-1.atxpkg.zip"));
+        assert!(is_valid_package_fn("package_name-1.0-1.atxpkg.zip"));
+        assert!(is_valid_package_fn("pkg.name-2.3.4-10.atxpkg.zip"));
+        assert!(is_valid_package_fn("a-1-1.atxpkg.zip"));
+        assert!(is_valid_package_fn("atxpkg-1.5-3.atxpkg.zip"));
+        assert!(is_valid_package_fn("atx300-base-6.3-1.atxpkg.zip"));
+        assert!(is_valid_package_fn("test-1.0-1.atxpkg.zip"));
+
+        assert!(!is_valid_package_fn("invalid.zip"));
+        assert!(!is_valid_package_fn("package.tar.gz"));
+        assert!(!is_valid_package_fn("package-1.0.atxpkg.zip"));
+        assert!(!is_valid_package_fn("-1.0-1.atxpkg.zip"));
+        assert!(!is_valid_package_fn("package-1.0-1.zip"));
+        assert!(!is_valid_package_fn(""));
+        assert!(!is_valid_package_fn("package--1.atxpkg.zip"));
+    }
+
+    #[test]
     fn test_get_recursive_listing() {
         let tmp_dir = tempfile::Builder::new().tempdir().unwrap();
         let tmp_dir_str = tmp_dir.path().to_str().unwrap();
