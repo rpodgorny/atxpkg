@@ -1578,6 +1578,7 @@ mod tests {
 
     #[test]
     fn test_is_valid_package_fn() {
+        // valid cases
         assert!(is_valid_package_fn("my-package-1.0.0-1.atxpkg.zip"));
         assert!(is_valid_package_fn("package_name-1.0-1.atxpkg.zip"));
         assert!(is_valid_package_fn("pkg.name-2.3.4-10.atxpkg.zip"));
@@ -1586,6 +1587,7 @@ mod tests {
         assert!(is_valid_package_fn("atx300-base-6.3-1.atxpkg.zip"));
         assert!(is_valid_package_fn("test-1.0-1.atxpkg.zip"));
 
+        // invalid cases
         assert!(!is_valid_package_fn("invalid.zip"));
         assert!(!is_valid_package_fn("package.tar.gz"));
         assert!(!is_valid_package_fn("package-1.0.atxpkg.zip"));
