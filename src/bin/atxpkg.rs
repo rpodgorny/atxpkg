@@ -153,7 +153,9 @@ fn log_init(fn_: Option<&str>, level: Option<&str>, show: bool) -> anyhow::Resul
 }
 
 fn main_sub() -> anyhow::Result<u8> {
-    std::env::set_var("RUST_BACKTRACE", "1");
+    unsafe {
+        std::env::set_var("RUST_BACKTRACE", "1");
+    }
 
     let mainargs = MainArgs::parse();
 
