@@ -10,14 +10,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
-- Say "download" instead of "update" in downloadonly confirmation prompt.
-- Update dependencies (rand 0.9.4).
 
 ### Deprecated
 
 ### Removed
 
 ### Fixed
+
+### Security
+
+## [10.8.1] - 2026-04-15
+
+### Changed
+- Say "download" instead of "update" in downloadonly confirmation prompt.
+- Update dependencies (rand 0.9.4).
 
 ### Security
 - Update rustls-webpki to 0.103.12 to fix RUSTSEC-2026-0098.
