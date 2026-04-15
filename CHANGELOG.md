@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 ### Security
+- Update rustls-webpki to 0.103.12 to fix RUSTSEC-2026-0098.
+- Update fastrand to 2.4.1 (previous version was yanked).
 
 ## [10.8.0] - 2026-04-06
 
