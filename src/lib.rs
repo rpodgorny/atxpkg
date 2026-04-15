@@ -1264,10 +1264,16 @@ pub fn update_packages(
     }
 
     for pu in &package_updates {
-        println!(
-            "update {}-{} -> {}-{}",
-            pu.name_old, pu.version_old, pu.name_new, pu.version_new
-        );
+        match download_only {
+            true => println!(
+                "download {}-{} -> {}-{}",
+                pu.name_old, pu.version_old, pu.name_new, pu.version_new
+            ),
+            false => println!(
+                "update {}-{} -> {}-{}",
+                pu.name_old, pu.version_old, pu.name_new, pu.version_new
+            ),
+        }
     }
     if no || !(yes || yes_no("continue?", "y")?) {
         return Ok(false);
