@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 ### Security
+- Update rustls-webpki to 0.103.13 to fix RUSTSEC-2026-0104.
+- Update openssl to 0.10.78 to fix GHSA-8c75-8mhr-p7r9, GHSA-ghm9-cr32-g9qj, GHSA-hppc-g8h3-xhp3, GHSA-pqf5-4pqq-29f5, GHSA-xmgf-hq76-4vx2.
 
 ## [10.8.1] - 2026-04-15
 
