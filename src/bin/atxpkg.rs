@@ -228,6 +228,9 @@ fn main_sub() -> anyhow::Result<u8> {
                 repos.push(line.to_string());
             }
         }
+    } else {
+        repos.push("https://atxpkg.asterix.cz".to_string());
+        repos.push("https://atxpkg-dev.asterix.cz".to_string());
     }
     log::debug!("repos: {repos:?}");
 
