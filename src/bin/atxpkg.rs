@@ -102,7 +102,12 @@ struct ShowUntrackedArgs {
 }
 
 // TODO: cut-n-pasted from router and modified - unite!
-fn log_init(fn_: Option<&str>, level: Option<&str>, show: bool) -> anyhow::Result<()> {
+fn log_init(
+    fn_: Option<&str>,
+    level: Option<&str>,
+    show: bool,
+    lenient: bool,
+) -> anyhow::Result<()> {
     let log_level_term = if let Some(level) = level {
         level.to_string()
     } else if let Ok(level) = std::env::var("RUST_LOG") {
@@ -136,15 +141,22 @@ fn log_init(fn_: Option<&str>, level: Option<&str>, show: bool) -> anyhow::Resul
         loggers.push(termlogger);
     }
     if let Some(fn_) = fn_ {
-        let filelogger = simplelog::WriteLogger::new(
-            log_level_file,
-            log_config,
-            std::fs::OpenOptions::new()
-                .append(true)
-                .create(true)
-                .open(fn_)?,
-        );
-        loggers.push(filelogger);
+        match std::fs::OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(fn_)
+        {
+            Ok(file) => {
+                let filelogger = simplelog::WriteLogger::new(log_level_file, log_config, file);
+                loggers.push(filelogger);
+            }
+            Err(e) if lenient => {
+                eprintln!(
+                    "WARNING: failed to open log file {fn_}: {e}, continuing without file logging"
+                );
+            }
+            Err(e) => return Err(e.into()),
+        }
     }
     if !loggers.is_empty() {
         simplelog::CombinedLogger::init(loggers)?;
@@ -167,17 +179,26 @@ fn main_sub() -> anyhow::Result<u8> {
     #[cfg(target_os = "windows")]
     let root_dir = "c:/atxpkg";
 
+    // on linux a missing root dir is tolerated (warn and continue); on other
+    // platforms (windows) the folder is required.
+    let lenient = std::env::consts::OS == "linux";
+
     let log_fn = format!("{root_dir}/atxpkg.log");
 
-    log_init(Some(&log_fn), Some("debug"), mainargs.debug)?;
+    log_init(Some(&log_fn), Some("debug"), mainargs.debug, lenient)?;
 
     log::info!("starting atxpkg v{}", env!("CARGO_PKG_VERSION"));
     eprintln!("starting atxpkg v{}", env!("CARGO_PKG_VERSION"));
 
     log::debug!("args: {mainargs:#?}");
 
-    if !Path::new(root_dir).exists() {
-        return Err(anyhow::anyhow!("root dir {root_dir} does not exist"));
+    let root_dir_exists = Path::new(root_dir).exists();
+    if !root_dir_exists {
+        if !lenient {
+            anyhow::bail!("root dir {root_dir} does not exist");
+        }
+        log::warn!("root dir {root_dir} does not exist, continuing");
+        eprintln!("WARNING: root dir {root_dir} does not exist, continuing");
     }
     if !Path::new(&mainargs.prefix).exists() {
         anyhow::bail!("prefix dir {} does not exist", &mainargs.prefix);
@@ -188,11 +209,11 @@ fn main_sub() -> anyhow::Result<u8> {
     let db_fn = format!("{root_dir}/installed.json");
     let repos_fn = format!("{root_dir}/repos.txt");
 
-    if !Path::new(&cache_dir).exists() {
+    if root_dir_exists && !Path::new(&cache_dir).exists() {
         log::info!("creating cache dir {cache_dir}");
         std::fs::create_dir(&cache_dir)?;
     }
-    if !Path::new(&tmp_dir_prefix).exists() {
+    if root_dir_exists && !Path::new(&tmp_dir_prefix).exists() {
         log::info!("creating tmp dir {tmp_dir_prefix}");
         std::fs::create_dir(&tmp_dir_prefix)?;
     }
