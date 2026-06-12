@@ -405,7 +405,7 @@ pub fn list_available(
                 ret.push((p.clone(), version.clone()));
             }
         }
-        ret.sort_unstable();
+        ret.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| compare_versions(&a.1, &b.1)));
     }
     Ok(ret)
 }
