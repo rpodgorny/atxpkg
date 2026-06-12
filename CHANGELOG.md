@@ -8,14 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Allow specification of repositories on the command line.
+- Default to asterix repos when none are specified and `repos.txt` is missing.
 
 ### Changed
+- Be more forgiving of a non-existent base directory on Linux.
+- Update dependencies (openssl 0.10.80).
 
 ### Deprecated
 
 ### Removed
 
 ### Fixed
+- Sort available versions numerically instead of alphabetically.
 
 ### Security
 - Update rustls-webpki to 0.103.13 to fix RUSTSEC-2026-0104.
