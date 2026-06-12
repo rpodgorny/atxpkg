@@ -16,6 +16,9 @@ struct MainArgs {
     #[cfg(target_os = "windows")]
     #[arg(long, default_value = "c:/")]
     prefix: String,
+    /// Repository url (can be specified multiple times). When specified, repos.txt is not loaded.
+    #[arg(long = "repo")]
+    repos: Vec<String>,
     /// Enable debug mode.
     #[arg(long, default_value = "false")]
     debug: bool,
@@ -195,7 +198,9 @@ fn main_sub() -> anyhow::Result<u8> {
     }
 
     let mut repos = vec![cache_dir.clone()];
-    if Path::new(&repos_fn).exists() {
+    if !mainargs.repos.is_empty() {
+        repos.extend(mainargs.repos.iter().cloned());
+    } else if Path::new(&repos_fn).exists() {
         for line in std::fs::read_to_string(&repos_fn)?.lines() {
             let line = line.trim();
             if !line.is_empty() && !line.starts_with('#') {
